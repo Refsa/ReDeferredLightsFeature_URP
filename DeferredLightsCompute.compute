@@ -1,0 +1,155 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UpsampleOutput
+#pragma kernel DownsampleInput
+#pragma kernel ComputeLights
+#pragma kernel DownsampleDepth
+
+#include "UnityCG.cginc"
+
+float _RenderScale;
+
+float2 _InputSize;
+RWTexture2D<float4> _DeferredColorTexture;
+RWTexture2D<float4> _DeferredLightsTexture;
+
+float2 _OutputSize;
+RWTexture2D<float4> _DeferredOutputTexture;
+
+Texture2D<float4> _DownsampleColorInput;
+
+[numthreads(32,18,1)]
+void UpsampleOutput (uint3 id : SV_DispatchThreadID)
+{
+    float4 col = _DeferredColorTexture[id.xy];
+    float4 light = _DeferredLightsTexture[id.xy];
+
+    col.rgb = lerp(col.rgb, light.rgb, light.a);
+
+    float2 diff = 1.0 / (_InputSize / _OutputSize);
+
+    for (int i = 0; i < diff.x; i++)
+    {
+        for (int j = 0; j < diff.y; j++)
+        {
+            float2 samplePos = id.xy * (1 / _RenderScale) + float2(i, j);
+            _DeferredOutputTexture[samplePos] = col;
+        }
+    }
+}
+
+[numthreads(32,18,1)]
+void DownsampleInput (uint3 id : SV_DispatchThreadID)
+{
+    const float3x3 DownsampleKernel =
+        float3x3(
+            0.015625, 0.046875, 0.015625,
+            0.046875, 0.75, 0.046875,
+            0.015625, 0.046875, 0.015625
+        );
+
+    float4 avgCol = 0;
+    for (int i = -1; i <= 1; i++)
+    {
+        for (int j = -1; j <= 1; j++)
+        {
+            float2 offset = float2(i, j);
+            avgCol += _DownsampleColorInput[id.xy + offset] * DownsampleKernel[offset.x][offset.y];
+        }
+    }
+
+    _DeferredColorTexture[id.xy * _RenderScale] = avgCol;
+}
+
+// ###########################
+// #### LIGHTS START HERE ####
+// ###########################
+
+uint _DebugMode;
+
+struct LightData
+{
+    float3 Position;
+    float4 Color;
+    float Intensity;
+    float Range;
+};
+
+StructuredBuffer<LightData> _LightData;
+uint _LightCount;
+float4x4 _MVP;
+float3 _CameraPos;
+
+RWTexture2D<float4> _DepthTexture;
+Texture2D<float4> _DownsampleDepthInput;
+
+[numthreads(32,18,1)]
+void DownsampleDepth (uint3 id : SV_DispatchThreadID)
+{
+    float avgDepth = 0;
+    for (int i = -1; i <= 1; i++)
+    {
+        for (int j = -1; j <= 1; j++)
+        {
+            float2 offset = float2(i, j);
+            avgDepth += _DownsampleDepthInput[id.xy + offset];
+        }
+    }
+    avgDepth /= 9;
+ 
+    _DepthTexture[id.xy * _RenderScale] = float4(avgDepth, 0, 0, 0);
+}
+
+Texture2D<float4> _DepthNormalsTexture;
+Texture2D<float4> _WorldPositionsTexture; 
+
+float3 DecodeNormal(float4 enc)
+{
+    float kScale = 1.7777;
+    float3 nn = enc.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
+    float g = 2.0 / dot(nn.xyz,nn.xyz);
+    float3 n;
+    n.xy = g*nn.xy;
+    n.z = g-1;
+    return n;
+}
+
+[numthreads(32,18,1)]
+void ComputeLights (uint3 id : SV_DispatchThreadID)
+{
+    float4 sceneCol = _DeferredColorTexture[id.xy];
+
+    float4 depthNormal = _DepthNormalsTexture[id.xy];
+    float3 normal = 0; float depth = 0;
+    normal = DecodeNormal(depthNormal);
+    depth = _DepthTexture[id.xy].r;
+
+    float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+
+    if (_DebugMode != 0)
+    { 
+        const int NormalsDebugMode = _DebugMode == 1;
+        const int DepthDebugMode = _DebugMode == 2;
+        const int PositionsDebugMode = _DebugMode == 3;
+
+        _DeferredLightsTexture[id.xy] = 
+            float4(depth, depth, depth, 1.0) * DepthDebugMode + 
+            float4(normal, 1.0) * NormalsDebugMode + 
+            float4(worldPos, 1.0) * PositionsDebugMode;
+        return;
+    }
+
+    // _DeferredLightsTexture[id.xy] = float4(worldPos + normal,1.0);
+    _DeferredLightsTexture[id.xy] = 0;
+
+    for (int i = 0; i < _LightCount; i++)
+    {
+        LightData ld = _LightData[i];
+
+        float dist = saturate(distance(worldPos, ld.Position) / ld.Range);
+
+        _DeferredLightsTexture[id.xy] = float4(dist, dist, dist, 1.0);
+
+        // _DeferredLightsTexture[id.xy] += float4(ld.Color.rgb, exp(-dist));
+    }
+    // _DeferredLightsTexture[id.xy] *= rcp(_LightCount);
+} 
