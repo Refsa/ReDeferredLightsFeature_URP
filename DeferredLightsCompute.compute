@@ -20,10 +20,11 @@ Texture2D<float4> _DownsampleColorInput;
 [numthreads(32,18,1)]
 void UpsampleOutput (uint3 id : SV_DispatchThreadID)
 {
-    float4 col = _DeferredColorTexture[id.xy];
     float4 light = _DeferredLightsTexture[id.xy];
+    float3 lightStrength = light.rgb * light.a;
 
-    col.rgb = lerp(col.rgb, light.rgb, light.a);
+    // float4 col = _DeferredColorTexture[id.xy];
+    // col.rgb += (light.rgb * light.a);
 
     float2 diff = 1.0 / (_InputSize / _OutputSize);
 
@@ -32,7 +33,11 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
         for (int j = 0; j < diff.y; j++)
         {
             float2 samplePos = id.xy * (1 / _RenderScale) + float2(i, j);
-            _DeferredOutputTexture[samplePos] = col;
+
+            float4 colSample = _DownsampleColorInput[samplePos];
+            colSample.rgb += (light.rgb * light.a);
+
+            _DeferredOutputTexture[samplePos] = colSample;
         }
     }
 }
@@ -69,7 +74,7 @@ uint _DebugMode;
 struct LightData
 {
     float3 Position;
-    float4 Color;
+    float3 Color;
     float Intensity;
     float Range;
 };
@@ -85,21 +90,7 @@ Texture2D<float> _DownsampleDepthInput;
 [numthreads(32,18,1)]
 void DownsampleDepth (uint3 id : SV_DispatchThreadID)
 {
-    // float avgDepth = 0;
-    // for (int i = -1; i <= 1; i++)
-    // {
-        // for (int j = -1; j <= 1; j++)
-        // {
-            // float2 offset = float2(i, j);
-            // avgDepth += _DownsampleDepthInput[id.xy + offset];
-        // }
-    // }
-    // avgDepth /= 9;
-
-    float avgDepth = _DownsampleDepthInput[id.xy].r;
-    // avgDepth = LinearEyeDepth(avgDepth);
- 
-    _DepthTexture[id.xy * _RenderScale] = float4(avgDepth, 0, 0, 0);
+    _DepthTexture[id.xy * _RenderScale] = _DownsampleDepthInput[id.xy].r;
 }
 
 Texture2D<float4> _DepthNormalsTexture;
@@ -119,12 +110,9 @@ float3 DecodeNormal(float4 enc)
 [numthreads(32,18,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
-    float4 sceneCol = _DeferredColorTexture[id.xy];
-
     float4 depthNormal = _DepthNormalsTexture[id.xy];
-    float3 normal = 0; float depth = 0;
-    normal = DecodeNormal(depthNormal);
-    depth = _DepthTexture[id.xy].r;
+    float3 normal = DecodeNormal(depthNormal);
+    float depth = _DepthTexture[id.xy].r;
 
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
@@ -141,18 +129,24 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
         return;
     }
 
-    // _DeferredLightsTexture[id.xy] = float4(worldPos + normal,1.0);
-    _DeferredLightsTexture[id.xy] = 0;
+    _DeferredLightsTexture[id.xy] = float4(0,0,0,0);
+    float4 accLight = 0;
 
+    [loop]
     for (int i = 0; i < _LightCount; i++)
     {
         LightData ld = _LightData[i];
 
         float dist = saturate(distance(worldPos, ld.Position) / ld.Range);
+        if (dist >= 1.0) continue;
 
-        _DeferredLightsTexture[id.xy] = float4(dist, dist, dist, 1.0);
+        float intensity = saturate(exp(-6 * dist * dist)) * ld.Intensity;
+        float4 col = float4(ld.Color, intensity);
 
-        // _DeferredLightsTexture[id.xy] += float4(ld.Color.rgb, exp(-dist));
+        accLight += col;
     }
-    // _DeferredLightsTexture[id.xy] *= rcp(_LightCount);
+    
+    accLight.a = saturate(accLight.a);
+    accLight.rgb = normalize(accLight.rgb);
+    _DeferredLightsTexture[id.xy] = accLight;
 } 

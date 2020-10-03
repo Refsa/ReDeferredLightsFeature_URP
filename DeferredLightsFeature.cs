@@ -20,11 +20,11 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     struct LightData
     {
         public Vector3 Position;
-        public Color Color;
+        public Vector3 Color;
         public float Intensity;
         public float Range;
 
-        public static int SizeBytes => 36;
+        public static int SizeBytes => 32;
     }
 
     class DepthNormalsPass : ScriptableRenderPass
@@ -79,15 +79,18 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
 
-            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+            using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: DepthNormalsPass")))
+            {
+                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
-            var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-            drawSettings.perObjectData = PerObjectData.None;
-            drawSettings.overrideMaterial = _depthNormalsMaterial;
+                var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
+                drawSettings.perObjectData = PerObjectData.None;
+                drawSettings.overrideMaterial = _depthNormalsMaterial;
 
-            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
+                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
+                cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
+            }
 
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
@@ -138,8 +141,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             int height = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
 
             wpDescriptor = cameraTextureDescriptor;
-            wpDescriptor.colorFormat = RenderTextureFormat.ARGB32;
-            wpDescriptor.depthBufferBits = 0;
+            wpDescriptor.colorFormat = RenderTextureFormat.ARGBFloat;
+            wpDescriptor.depthBufferBits = 32;
             wpDescriptor.msaaSamples = 1;
             wpDescriptor.width = width;
             wpDescriptor.height = height;
@@ -155,15 +158,19 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
 
-            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+            using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: WorldPositionPass Render")))
+            {
+                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
-            var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-            drawSettings.perObjectData = PerObjectData.None;
-            drawSettings.overrideMaterial = _worldPositionMaterial;
+                var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
+                drawSettings.perObjectData = PerObjectData.None;
+                drawSettings.overrideMaterial = _worldPositionMaterial;
 
-            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
+                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+                cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+
+            }
 
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
@@ -243,6 +250,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             passSize = new Vector2(width, height);
             renderSize = new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height);
 
+            cmd.BeginSample("DeferredLightsPass: Setup");
+
             // Color RT
             {
                 RenderTextureDescriptor rtd = new RenderTextureDescriptor(width, height);
@@ -281,11 +290,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
                 cmd.GetTemporaryRT(outputHandle.id, rtd);
             }
 
+            // ### GET ALL LIGHTS IN SCENE ###
             int ldIndex = 0;
             foreach (var ld in Resources.FindObjectsOfTypeAll<DeferredLightsData>())
             {
                 lightDatas[ldIndex].Position = ld.transform.position;
-                lightDatas[ldIndex].Color = ld.Color;
+                lightDatas[ldIndex].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
                 lightDatas[ldIndex].Intensity = ld.Intensity;
                 lightDatas[ldIndex].Range = ld.Range;
 
@@ -321,7 +331,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
                 cmd.SetComputeTextureParam(_lightsCompute, UpsampleOutputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
             }
 
-            // ### COMPUTE LIGHT ###
+            // ### SETUP LIGHT COMPUTE ###
             {
                 lightDataBuffer.SetData(lightDatas, 0, 0, ldIndex);
                 cmd.SetComputeIntParam(_lightsCompute, "_LightCount", ldIndex);
@@ -330,13 +340,18 @@ public class DeferredLightsFeature : ScriptableRendererFeature
                 cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, colorID, colorHandle.Identifier());
                 cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
             }
+
+            cmd.EndSample("DeferredLightsPass: Setup");
         }
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             CommandBuffer cmd = CommandBufferPool.Get("DeferredLightsFeature");
+
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
+
+            cmd.BeginSample("DeferredLightsPass: Execute");
 
             ref CameraData cameraData = ref renderingData.cameraData;
 
@@ -352,7 +367,9 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             // ### DISPATCH LIGHT AND UPSAMPLE COMPUTE ###
             {
                 cmd.DispatchCompute(_lightsCompute, ComputeLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
+                cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
                 cmd.DispatchCompute(_lightsCompute, UpsampleOutputKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
+                cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
             }
 
             // ### BLIT RESULTS BACK INTO RENDER BUFFER ###
@@ -377,6 +394,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
                 cmd.Blit(outputHandle.id, cameraTarget);
             }
+
+            cmd.EndSample("DeferredLightsPass: Execute");
 
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
@@ -424,7 +443,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         DownsampleDepthKernelID = lightsCompute.FindKernel("DownsampleDepth");
 
         depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture");
-        worldPositionMaterial = CoreUtils.CreateEngineMaterial("Hidden/WorldPosition");
+        worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
 
         depthNormalsPass = new DepthNormalsPass(settings, lightsCompute, depthNormalsMaterial);
         worldPositionPass = new WorldPositionPass(settings, lightsCompute, worldPositionMaterial);
