@@ -79,22 +79,25 @@ uint _LightCount;
 float4x4 _MVP;
 float3 _CameraPos;
 
-RWTexture2D<float4> _DepthTexture;
-Texture2D<float4> _DownsampleDepthInput;
+RWTexture2D<float> _DepthTexture;
+Texture2D<float> _DownsampleDepthInput;
 
 [numthreads(32,18,1)]
 void DownsampleDepth (uint3 id : SV_DispatchThreadID)
 {
-    float avgDepth = 0;
-    for (int i = -1; i <= 1; i++)
-    {
-        for (int j = -1; j <= 1; j++)
-        {
-            float2 offset = float2(i, j);
-            avgDepth += _DownsampleDepthInput[id.xy + offset];
-        }
-    }
-    avgDepth /= 9;
+    // float avgDepth = 0;
+    // for (int i = -1; i <= 1; i++)
+    // {
+        // for (int j = -1; j <= 1; j++)
+        // {
+            // float2 offset = float2(i, j);
+            // avgDepth += _DownsampleDepthInput[id.xy + offset];
+        // }
+    // }
+    // avgDepth /= 9;
+
+    float avgDepth = _DownsampleDepthInput[id.xy].r;
+    // avgDepth = LinearEyeDepth(avgDepth);
  
     _DepthTexture[id.xy * _RenderScale] = float4(avgDepth, 0, 0, 0);
 }

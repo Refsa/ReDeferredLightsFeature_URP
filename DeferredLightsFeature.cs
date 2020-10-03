@@ -80,9 +80,9 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             cmd.Clear();
 
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
             drawSettings.perObjectData = PerObjectData.None;
-
             drawSettings.overrideMaterial = _depthNormalsMaterial;
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
@@ -106,7 +106,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     class WorldPositionPass : ScriptableRenderPass
     {
         const string WORLD_POSITIONS_ID = "_WorldPositionsTexture";
-        const string HANDLE_ID = "WorldPositions";
+        const string HANDLE_ID = "_WorldPositions";
 
         Settings _settings;
 
@@ -127,7 +127,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
             shaderTagId = new ShaderTagId("DepthOnly");
             renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
-            filteringSettings = new FilteringSettings(RenderQueueRange.all, -1);
+            filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
             wpHandle.Init(HANDLE_ID);
         }
@@ -139,15 +139,14 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
             wpDescriptor = cameraTextureDescriptor;
             wpDescriptor.colorFormat = RenderTextureFormat.ARGB32;
-            wpDescriptor.depthBufferBits = 24;
+            wpDescriptor.depthBufferBits = 0;
             wpDescriptor.msaaSamples = 1;
             wpDescriptor.width = width;
             wpDescriptor.height = height;
-
             cmd.GetTemporaryRT(wpHandle.id, wpDescriptor, FilterMode.Point);
 
             ConfigureTarget(wpHandle.Identifier());
-            ConfigureClear(ClearFlag.All, Color.yellow);
+            ConfigureClear(ClearFlag.All, Color.clear);
         }
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -157,14 +156,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             cmd.Clear();
 
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
             drawSettings.perObjectData = PerObjectData.None;
             drawSettings.overrideMaterial = _worldPositionMaterial;
 
-            var renderStateBlock = new RenderStateBlock();
-            renderStateBlock.depthState = new DepthState(true, CompareFunction.Less);
-
-            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
+            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(_lightsCompute, ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
 
@@ -198,7 +195,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         RenderTargetHandle outputHandle;
         RenderTargetHandle colorFullscreenHandle;
 
-        RenderTargetHandle scaledDepthHandle;
+        RenderTargetHandle depthHandle;
         RenderTargetHandle depthFullscreenHandle;
 
         ComputeShader _lightsCompute;
@@ -225,7 +222,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
                 colorHandle.Init(colorID);
                 colorFullscreenHandle.Init(colorFullscreenID);
 
-                scaledDepthHandle.Init(depthID);
+                depthHandle.Init(depthID);
                 depthFullscreenHandle.Init(depthFullscreenID);
             }
 
@@ -265,13 +262,13 @@ public class DeferredLightsFeature : ScriptableRendererFeature
                 rtd.depthBufferBits = 32;
                 cmd.GetTemporaryRT(depthFullscreenHandle.id, rtd);
 
-                rtd.colorFormat = RenderTextureFormat.ARGB32;
+                rtd.colorFormat = RenderTextureFormat.R8;
                 rtd.depthBufferBits = 32;
                 rtd.msaaSamples = 1;
                 rtd.enableRandomWrite = true;
                 rtd.width = width;
                 rtd.height = height;
-                cmd.GetTemporaryRT(scaledDepthHandle.id, rtd);
+                cmd.GetTemporaryRT(depthHandle.id, rtd);
             }
 
             // Full size RT
@@ -313,7 +310,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             {
                 cmd.Blit(depthAttachment, depthFullscreenHandle.Identifier());
                 cmd.SetComputeTextureParam(_lightsCompute, DownsampleDepthKernelID, depthFullscreenID, depthFullscreenHandle.Identifier());
-                cmd.DispatchCompute(_lightsCompute, DownsampleDepthKernelID, width / 32, height / 18, 1);
+                cmd.DispatchCompute(_lightsCompute, DownsampleDepthKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
             }
 
             // ### OUTPUT UPSAMPLE ###
@@ -393,7 +390,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             cmd.ReleaseTemporaryRT(colorHandle.id);
             cmd.ReleaseTemporaryRT(colorFullscreenHandle.id);
 
-            cmd.ReleaseTemporaryRT(scaledDepthHandle.id);
+            cmd.ReleaseTemporaryRT(depthHandle.id);
             cmd.ReleaseTemporaryRT(depthFullscreenHandle.id);
         }
 
@@ -448,14 +445,14 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         lightsPass?.Dispose();
     }
 
-    private void OnEnable() 
+    void OnEnable()
     {
-        lightsPass.Dispose();
+        lightsPass?.PrepareBuffers();
     }
 
-    private void OnDisable() 
+    void OnDisable()
     {
-        lightsPass.PrepareBuffers();
+        lightsPass?.Dispose();
     }
 }
 
