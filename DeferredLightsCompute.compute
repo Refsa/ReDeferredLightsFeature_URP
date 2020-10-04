@@ -5,7 +5,8 @@
 #pragma kernel DownsampleDepth
 #pragma kernel BlurLightsTexture
 
-#include "UnityCG.cginc"
+// #include "UnityCG.cginc"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 
 float _RenderScale;
 
@@ -105,53 +106,58 @@ float3 DecodeNormal(float4 enc)
     return n;
 }
 
-[numthreads(32,18,1)]
+[numthreads(32,32,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
-    _DeferredLightsTexture[id.xy] = float4(0,0,0,0);
+    // if (_DebugMode != 0)
+    // { 
+        // const int NormalsDebugMode = _DebugMode == 1;
+        // const int DepthDebugMode = _DebugMode == 2;
+        // const int PositionsDebugMode = _DebugMode == 3;
+        // _DeferredLightsTexture[id.xy] = 
+            // float4(depth, depth, depth, 1.0) * DepthDebugMode + 
+            // float4(normal, 1.0) * NormalsDebugMode + 
+            // float4(worldPos, 1.0) * PositionsDebugMode;
+        // return;
+    // }
 
+    // if (id.x > _InputSize.x || id.y > _InputSize.y) return;
+
+    // float3 sceneCol = _DeferredColorTexture[id.xy].rgb;
     float4 depthNormal = _DepthNormalsTexture[id.xy];
     float3 normal = DecodeNormal(depthNormal);
     float depth = _DepthTexture[id.xy].r;
-
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
-    if (length(worldPos) == 0) 
-    {
-        return;
-    }
+    UNITY_BRANCH
+    if (dot(worldPos, worldPos) == 0) return;
 
-    if (_DebugMode != 0)
-    { 
-        const int NormalsDebugMode = _DebugMode == 1;
-        const int DepthDebugMode = _DebugMode == 2;
-        const int PositionsDebugMode = _DebugMode == 3;
-
-        _DeferredLightsTexture[id.xy] = 
-            float4(depth, depth, depth, 1.0) * DepthDebugMode + 
-            float4(normal, 1.0) * NormalsDebugMode + 
-            float4(worldPos, 1.0) * PositionsDebugMode;
-        return;
-    }
-
-    float4 accLight = 0;
+    float4 accLight = 0, col = 0;
+    float atten = 0, intensity = 0, dist = 0;
 
     [loop]
     for (int i = 0; i < _LightCount; i++)
     {
         LightData ld = _LightData[i];
+        
+        dist = length(worldPos - ld.Position);
+        if (dist > ld.Range) continue;
+        // atten = clamp(ld.Range - dist, 0, ld.Range);
+        atten = smoothstep(0, ld.Range, ld.Range - dist);
 
-        float dist = saturate(distance(worldPos, ld.Position) / ld.Range);
-        if (dist >= 1.0) continue;
+        // intensity = rcp(ld.Range) * atten / ld.Range;
+        // col.rgb += ld.Color;
+        // col.a += intensity * exp2(ld.Intensity * 1.7) * exp(-col.a);
+        // accLight += col;
 
-        float intensity = saturate(exp(-6 * dist * dist)) * ld.Intensity;
-        float4 col = float4(ld.Color, intensity);
+        intensity = 1.0 / (Luminance(ld.Color * ld.Intensity) + 1);
 
+        col.rgb = ld.Color * intensity;
+        col.a = intensity * atten;
+        
         accLight += col;
     }
-    
-    accLight.a = saturate(accLight.a);
-    accLight.rgb = normalize(accLight.rgb);
+
     _DeferredLightsTexture[id.xy] = accLight;
 } 
 

@@ -4,7 +4,7 @@ using UnityEngine.Rendering.Universal;
 
 public class DeferredLightsFeature : ScriptableRendererFeature
 {
-    public const int MAX_LIGHTS = 1024;
+    public const int MAX_LIGHTS = 1 << 16;
 
     public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3 };
 

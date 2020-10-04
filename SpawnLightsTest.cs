@@ -12,10 +12,10 @@ public class SpawnLightsTest : MonoBehaviour
     {
         for (int i = 0; i < spawnCount; i++)
         {
-            var lightgo = GameObject.Instantiate(lightPrefab);
+            var lightgo = GameObject.Instantiate(lightPrefab, transform);
 
             Vector2 pos = Random.insideUnitCircle * spawnRange;
-            lightgo.transform.position = new Vector3(pos.x, 0, pos.y);
+            lightgo.transform.localPosition = new Vector3(pos.x, 0, pos.y);
         }
     }
 
