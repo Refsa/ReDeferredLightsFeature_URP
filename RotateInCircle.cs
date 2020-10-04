@@ -10,11 +10,11 @@ public class RotateInCircle : MonoBehaviour
     void Awake()
     {
         center = transform.position + Vector3.right * Random.Range(-10f, 10f);
-        speed = Random.Range(-50f, 50f);
+        speed = Random.Range(-25f, 25f);
     }
 
     void Update()
     {
         transform.RotateAround(center, Vector3.up, speed * Time.deltaTime);
     }
-}
+} 

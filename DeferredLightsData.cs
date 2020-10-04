@@ -8,7 +8,9 @@ public class DeferredLightsData : MonoBehaviour
     [SerializeField] float intensity = 1f;
     [SerializeField] float range = 3f;
 
+    [Header("Debug and Testing")]
     [SerializeField] bool randomData = true;
+    [SerializeField] bool displayVolume;
 
     public Color Color => color;
     public float Intensity => intensity;
@@ -26,8 +28,26 @@ public class DeferredLightsData : MonoBehaviour
 
     void OnDrawGizmos()
     {
+        if (displayVolume)
+        {
+            color.a = 0.25f;
+            Gizmos.color = color;
+            color.a = 1f;
+            Gizmos.DrawSphere(transform.position, range);
+        }
+        
         Gizmos.color = color;
         Gizmos.DrawSphere(transform.position, 0.1f);
         Gizmos.DrawWireSphere(transform.position, range);
+    }
+
+    void OnEnable() 
+    {
+        DeferredLightsManager.AddLight(this);
+    }
+
+    void OnDestroy() 
+    {
+        DeferredLightsManager.RemoveLight(this);
     }
 }

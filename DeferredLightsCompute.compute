@@ -3,6 +3,7 @@
 #pragma kernel DownsampleInput
 #pragma kernel ComputeLights
 #pragma kernel DownsampleDepth
+#pragma kernel BlurLightsTexture
 
 #include "UnityCG.cginc"
 
@@ -22,9 +23,6 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
 {
     float4 light = _DeferredLightsTexture[id.xy];
     float3 lightStrength = light.rgb * light.a;
-
-    // float4 col = _DeferredColorTexture[id.xy];
-    // col.rgb += (light.rgb * light.a);
 
     float2 diff = 1.0 / (_InputSize / _OutputSize);
 
@@ -110,11 +108,18 @@ float3 DecodeNormal(float4 enc)
 [numthreads(32,18,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
+    _DeferredLightsTexture[id.xy] = float4(0,0,0,0);
+
     float4 depthNormal = _DepthNormalsTexture[id.xy];
     float3 normal = DecodeNormal(depthNormal);
     float depth = _DepthTexture[id.xy].r;
 
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+
+    if (length(worldPos) == 0) 
+    {
+        return;
+    }
 
     if (_DebugMode != 0)
     { 
@@ -129,7 +134,6 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
         return;
     }
 
-    _DeferredLightsTexture[id.xy] = float4(0,0,0,0);
     float4 accLight = 0;
 
     [loop]
@@ -150,3 +154,27 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
     accLight.rgb = normalize(accLight.rgb);
     _DeferredLightsTexture[id.xy] = accLight;
 } 
+
+[numthreads(32,18,1)]
+void BlurLightsTexture (uint3 id : SV_DispatchThreadID)
+{
+    const float3x3 BlurKernel =
+        mul(float3x3(
+            1,2,1,
+            2,4,2,
+            1,2,1
+        ), rcp(16));
+
+
+    float4 avgCol = 0;
+    for (int i = -1; i <= 1; i++)
+    {
+        for (int j = -1; j <= 1; j++)
+        {
+            float2 offset = float2(i, j);
+            avgCol += _DeferredLightsTexture[id.xy + offset] * BlurKernel[offset.x][offset.y];
+        }
+    }
+    
+    _DeferredLightsTexture[id.xy] = avgCol;
+}
