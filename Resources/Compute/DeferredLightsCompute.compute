@@ -1,21 +1,25 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel UpsampleOutput
-#pragma kernel DownsampleInput
 #pragma kernel ComputeLights
-#pragma kernel DownsampleDepth
 
 // #include "UnityCG.cginc"
-// #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl" 
 
 float _RenderScale;
 
+// GBuffers
+Texture2D<float4> _AlbedoTexture;
+Texture2D<float4> _SpecularTexture;
+Texture2D<float4> _DepthNormalsTexture;
+Texture2D<float4> _WorldPositionsTexture;
+
+// Lights Texture
 float2 _InputSize;
-RWTexture2D<float4> _DeferredColorTexture;
 RWTexture2D<float4> _DeferredLightsTexture;
 
+// Output Texture
 float2 _OutputSize;
 RWTexture2D<float4> _DeferredOutputTexture;
-Texture2D<float4> _DownsampleColorInput;
 
 [numthreads(32,32,1)]
 void UpsampleOutput (uint3 id : SV_DispatchThreadID)
@@ -26,7 +30,7 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
     float3 lightStrength = light.rgb * light.a;
 
     uint2 samplePos = 0;
-    float4 colSample = 0;
+    float4 colSample = 0, albedoSample = 0;
 
     for (uint i = 0; i < diff.x; i++)
     {
@@ -34,36 +38,12 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
         {
             samplePos = id.xy * rcp(_RenderScale) + uint2(i, j);
 
-            colSample = _DownsampleColorInput[samplePos];
+            // colSample = _AlbedoTexture[samplePos];
+            colSample = _DeferredOutputTexture[samplePos];
+
             colSample.rgb += lightStrength;
 
             _DeferredOutputTexture[samplePos] = colSample;
-        }
-    }
-}
-
-[numthreads(32,32,1)]
-void DownsampleInput (uint3 id : SV_DispatchThreadID)
-{
-    static const float3x3 DownsampleKernel =
-        float3x3(
-            0.015625, 0.046875, 0.015625,
-            0.046875, 0.75, 0.046875,
-            0.015625, 0.046875, 0.015625
-        );
-
-    _DeferredColorTexture[id.xy * _RenderScale] = 0;
-
-    int2 offset = 0;
-
-    [unroll]
-    for (int i = -1; i <= 1; i++)
-    {
-        [unroll]
-        for (int j = -1; j <= 1; j++)
-        {
-            offset.x = i; offset.y = j;
-            _DeferredColorTexture[id.xy * _RenderScale] += _DownsampleColorInput[id.xy + offset] * DownsampleKernel[offset.x + 1][offset.y + 1];
         }
     }
 }
@@ -72,7 +52,7 @@ void DownsampleInput (uint3 id : SV_DispatchThreadID)
 // #### LIGHTS START HERE ####
 // ###########################
 
-struct LightData
+struct DFLightData
 {
     float3 Position;
     float3 Color;
@@ -80,31 +60,11 @@ struct LightData
     float Range;
 };
 
-StructuredBuffer<LightData> _LightData;
+StructuredBuffer<DFLightData> _LightData;
 uint _LightCount;
 float4x4 _MVP;
+float4x4 MATRIX_IV;
 float3 _CameraPos;
-
-cbuffer LightData2
-{
-    float3 Position;
-    float3 Color;
-    float Intensity;
-    float Range;
-};
-
-RWTexture2D<float> _DepthTexture;
-Texture2D<float> _DownsampleDepthInput;
-
-[numthreads(32,32,1)]
-void DownsampleDepth (uint3 id : SV_DispatchThreadID)
-{
-    _DepthTexture[id.xy * _RenderScale] = _DownsampleDepthInput[id.xy].r;
-}
-
-Texture2D<float4> _AlbedoTexture;
-Texture2D<float4> _DepthNormalsTexture;
-Texture2D<float4> _WorldPositionsTexture;
 
 float3 DecodeNormal(float4 enc)
 {
@@ -117,69 +77,73 @@ float3 DecodeNormal(float4 enc)
     return n;
 }
 
-inline float Luminance(float3 linearRgb)
-{
-    return dot(linearRgb, float3(0.2126729, 0.7151522, 0.0721750));
-}
+// inline float Luminance(float3 linearRgb)
+// {
+//     return dot(linearRgb, float3(0.2126729, 0.7151522, 0.0721750));
+// }
 
 [numthreads(32,18,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
-    // float4 depthNormal = _DepthNormalsTexture[id.xy];
-    // float3 normal = DecodeNormal(depthNormal);
-    // float depth = _DepthTexture[id.xy].r;
+    float4 depthNormal = _DepthNormalsTexture[id.xy];
+    float4 specular = _SpecularTexture[id.xy];
+    float3 albedo = _AlbedoTexture[id.xy];
+    float3 normal = DecodeNormal(depthNormal);
+    normal = mul(MATRIX_IV, float4(normal, 0));
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
     const uint validPos = (dot(worldPos, worldPos) != 0);
     const uint maxLights = _LightCount * validPos;
 
     float4 accLight = 0, col = 0;
-    float3 ldir = 0;
+    float3 ldir = 0, vdir = 0;
     float atten = 0, intensity = 0, dist = 0;
-    LightData ld = (LightData)0;
+    DFLightData ld = (DFLightData)0;
 
-    // const uint batchCount = 32;
-    // uint batches = maxLights / batchCount;
-
-    // [unroll]
-    // for (uint j = 0; j < batchCount; j++)
+    // [loop]
+    // for (uint i = 0; i < maxLights; i++)
     // {
-    //     uint curr = j * batches;
-    //     [loop]
-    //     for (uint i = curr; i < curr + batches; i++)
-    //     {
-    //         ld = _LightData[i];
+    //     ld = _LightData[i];
          
-    //         ldir = (worldPos - ld.Position);
-    //         dist = dot(ldir, ldir);
+    //     ldir = (worldPos - ld.Position);
+    //     dist = dot(ldir, ldir);
 
-    //         [branch] if (dist > ld.Range) continue;
+    //     [branch] if (dist > ld.Range) continue;
 
-    //         atten = smoothstep(0, ld.Range, ld.Range - dist);
-    //         intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
+    //     atten = smoothstep(0, ld.Range, ld.Range - dist);
+    //     intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
 
-    //         col.rgb = ld.Color * intensity;
-    //         col.a = intensity;
+    //     col.rgb = ld.Color * intensity;
+    //     col.a = intensity;
 
-    //         accLight += col;
-    //     }
+    //     accLight += col;
     // }
+    
+    vdir = normalize(_CameraPos - worldPos);
 
     [loop]
     for (uint i = 0; i < maxLights; i++)
     {
         ld = _LightData[i];
          
-        ldir = (worldPos - ld.Position);
+        ldir = (ld.Position - worldPos);
         dist = dot(ldir, ldir);
 
         [branch] if (dist > ld.Range) continue;
 
+        ldir = normalize(ldir);
+
+        float3 halfVec = normalize(vdir + ldir);
+        half NdotH = saturate(dot(normal, halfVec));
+        half modifier = pow(NdotH, specular.w);
+        half3 specRef = specular.rgb * modifier;
+
         atten = smoothstep(0, ld.Range, ld.Range - dist);
         intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
 
-        col.rgb = ld.Color * intensity;
-        col.a = intensity;
+        col.rgb = albedo + specRef * ld.Color;
+
+        col.a = sqrt(0.01 * atten * rcp(ld.Intensity));
 
         accLight += col;
     }

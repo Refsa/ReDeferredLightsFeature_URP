@@ -9,16 +9,12 @@ public static class ComputeShaderUtils
     public static class LightsComputeKernels
     {
         public static int UpsampleOutputKernelID {get; private set;} = -1;
-        public static int DownsampleInputKernelID {get; private set;} = -1;
-        public static int DownsampleDepthKernelID {get; private set;} = -1;
         public static int ComputeLightsKernelID {get; private set;} = -1;
 
         internal static void Prepare()
         {
             UpsampleOutputKernelID = LightsCompute.FindKernel("UpsampleOutput");
-            DownsampleInputKernelID = LightsCompute.FindKernel("DownsampleInput");
             ComputeLightsKernelID = LightsCompute.FindKernel("ComputeLights");
-            DownsampleDepthKernelID = LightsCompute.FindKernel("DownsampleDepth");
         }
     }
 

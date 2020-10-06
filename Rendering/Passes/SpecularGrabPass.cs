@@ -1,17 +1,17 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using Settings = DeferredLightsFeature.Settings;
 
-class AlbedoGrabPass : ScriptableRenderPass
+class SpecularGrabPass : ScriptableRenderPass
 {
-    const string ALBEDO_ID = "_AlbedoTexture";
+    const string Specular_ID = "_SpecularTexture";
 
-    static readonly ShaderTagId ShaderTagMeta = new ShaderTagId("AlbedoPass");
+    static readonly ShaderTagId ShaderTagMeta = new ShaderTagId("SpecularPass");
 
-    RenderTargetHandle albedoHandle;
+    RenderTargetHandle specularHandle;
 
     FilteringSettings filteringSettings;
     RenderStateBlock renderStateBlock;
@@ -19,7 +19,7 @@ class AlbedoGrabPass : ScriptableRenderPass
     Settings _settings;
     ComputeShader _lightsCompute;
 
-    public AlbedoGrabPass(Settings settings)
+    public SpecularGrabPass(Settings settings)
     {
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
@@ -29,7 +29,7 @@ class AlbedoGrabPass : ScriptableRenderPass
 
         renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
 
-        albedoHandle.Init(ALBEDO_ID);
+        specularHandle.Init(Specular_ID);
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -44,12 +44,9 @@ class AlbedoGrabPass : ScriptableRenderPass
         rtd.depthBufferBits = 32;
         rtd.msaaSamples = 1;
         rtd.enableRandomWrite = true;
-        cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Point);
+        cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
 
-        // ComputeShaderUtils.Utils.DispatchClear(cmd, albedoHandle.Identifier(), width / 32, height / 18, Color.black);
-        // cmd.Blit(colorAttachment, albedoHandle.Identifier());
-
-        ConfigureTarget(albedoHandle.Identifier());
+        ConfigureTarget(specularHandle.Identifier());
         ConfigureClear(ClearFlag.Color, Color.black);
     }
 
@@ -59,15 +56,15 @@ class AlbedoGrabPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Albedo")))
+        using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Specular")))
         {
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
             var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
-            cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
+            cmd.SetGlobalTexture("_DeferredPass_Specular_Texture", specularHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, Specular_ID, specularHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);
@@ -76,9 +73,9 @@ class AlbedoGrabPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        if (albedoHandle != RenderTargetHandle.CameraTarget)
+        if (specularHandle != RenderTargetHandle.CameraTarget)
         {
-            cmd.ReleaseTemporaryRT(albedoHandle.id);
+            cmd.ReleaseTemporaryRT(specularHandle.id);
         }
     }
 }

@@ -6,7 +6,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 {
     public const int MAX_LIGHTS = 1 << 12;
 
-    public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3, Albedo = 4 };
+    public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3, Albedo = 4, Specular = 5, NormalWorld = 6 };
 
     [System.Serializable]
     public class Settings
@@ -36,7 +36,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     Material worldPositionMaterial;
 
     AlbedoGrabPass albedoGrabPass;
-    Material albedoGrabMaterial;
+
+    SpecularGrabPass specularGrabPass;
 
     DebugPass debugPass;
     Material debugMaterial;
@@ -57,7 +58,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture"); 
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
-        albedoGrabMaterial = new Material(Shader.Find("Hidden/GrabAlbedo"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
         lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
@@ -65,7 +65,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
         lightsPass = new DeferredLightsPass(settings);
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
-        albedoGrabPass = new AlbedoGrabPass(settings, albedoGrabMaterial);
+        albedoGrabPass = new AlbedoGrabPass(settings);
+        specularGrabPass = new SpecularGrabPass(settings);
 
         debugPass = new DebugPass(settings, debugMaterial); 
     }
@@ -82,6 +83,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         renderer.EnqueuePass(albedoGrabPass);
         renderer.EnqueuePass(depthNormalsPass);
         renderer.EnqueuePass(worldPositionPass);
+        renderer.EnqueuePass(specularGrabPass);
         renderer.EnqueuePass(lightsPass);
 
         renderer.EnqueuePass(debugPass);

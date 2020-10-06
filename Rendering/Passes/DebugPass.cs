@@ -38,6 +38,7 @@ class DebugPass : ScriptableRenderPass
         ref CameraData cameraData = ref renderingData.cameraData;
 
         Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;
+        debugMaterial?.SetMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
 
         if (cameraData.isDefaultViewport)
         {

@@ -26,6 +26,7 @@
             };
 
             uint _DebugMode;
+            float4x4 MATRIX_IV;
 
             sampler2D _BackBuffer_Image;
             float4 _BackBuffer_Image_ST;
@@ -38,6 +39,9 @@
 
             sampler2D _DeferredPass_Albedo_Texture;
             float4 _DeferredPass_Albedo_Texture_ST;
+
+            sampler2D _DeferredPass_Specular_Texture;
+            float4 _DeferredPass_Specular_Texture_ST;
 
             v2f vert (appdata v)
             {
@@ -55,9 +59,11 @@
 
                 if (_DebugMode == 0) return tex2D(_BackBuffer_Image, i.uv);
                 else if (_DebugMode == 1) return float4(normal, 1.0);
+                else if (_DebugMode == 6) return float4(mul(MATRIX_IV, float4(normal, 0)).xyz, 1.0);
                 else if (_DebugMode == 2) return float4(depth, depth, depth, 1.0);
                 else if (_DebugMode == 3) return tex2D(_DeferredPass_WorldPosition_Texture, i.uv);
                 else if (_DebugMode == 4) return tex2D(_DeferredPass_Albedo_Texture, i.uv);
+                else if (_DebugMode == 5) return tex2D(_DeferredPass_Specular_Texture, i.uv);
 
                 return float4(0,0,0,1);
             }

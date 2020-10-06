@@ -7,21 +7,10 @@ using LightData = DeferredLightsFeature.LightData;
 class DeferredLightsPass : ScriptableRenderPass
 {
     const string lightsID = "_DeferredLightsTexture";
-    const string outputID = "_DeferredOutputTexture";
+    const string colorFullscreenID = "_DeferredOutputTexture";
 
-    const string colorID = "_DeferredColorTexture";
-    const string colorFullscreenID = "_DownsampleColorInput";
-
-    const string depthID = "_DepthTexture";
-    const string depthFullscreenID = "_DownsampleDepthInput";
-
-    RenderTargetHandle colorHandle;
     RenderTargetHandle lightsHandle;
-    RenderTargetHandle outputHandle;
     RenderTargetHandle colorFullscreenHandle;
-
-    RenderTargetHandle depthHandle;
-    RenderTargetHandle depthFullscreenHandle;
 
     ComputeShader _lightsCompute;
     Settings _settings;
@@ -42,14 +31,9 @@ class DeferredLightsPass : ScriptableRenderPass
 
         // ### SETUP RENDER TEXTURE HANDLES ###
         {
-            outputHandle.Init(outputID);
             lightsHandle.Init(lightsID);
 
-            colorHandle.Init(colorID);
             colorFullscreenHandle.Init(colorFullscreenID);
-
-            depthHandle.Init(depthID);
-            depthFullscreenHandle.Init(depthFullscreenID);
         }
 
         PrepareBuffers();
@@ -57,12 +41,6 @@ class DeferredLightsPass : ScriptableRenderPass
  
     public void PrepareBuffers() 
     {
-        // if (lightDataBuffer == null)
-        // {
-        //     lightDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
-        //     UnityEngine.Debug.Log($"wat");
-        // }
-
         lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
     }
 
@@ -81,14 +59,6 @@ class DeferredLightsPass : ScriptableRenderPass
 
         cmd.BeginSample("DeferredLightsPass: Setup");
 
-        // Color RT
-        {
-            RenderTextureDescriptor rtd = new RenderTextureDescriptor(width, height);
-            rtd.colorFormat = cameraTextureDescriptor.colorFormat;
-            rtd.enableRandomWrite = true;
-            cmd.GetTemporaryRT(colorHandle.id, rtd);
-        }
-
         // Lights RT
         {
             RenderTextureDescriptor rtd = new RenderTextureDescriptor(width, height);
@@ -103,31 +73,11 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.GetTemporaryRT(lightsHandle.id, rtd);
         }
 
-        // Depth RT
-        {
-            var rtd = cameraTextureDescriptor;
-            rtd.colorFormat = RenderTextureFormat.Depth;
-            rtd.msaaSamples = 1;
-            rtd.depthBufferBits = 32;
-            cmd.GetTemporaryRT(depthFullscreenHandle.id, rtd);
-
-            rtd.colorFormat = RenderTextureFormat.R8;
-            rtd.depthBufferBits = 32;
-            rtd.msaaSamples = 1;
-            rtd.enableRandomWrite = true;
-            rtd.width = width;
-            rtd.height = height;
-            cmd.GetTemporaryRT(depthHandle.id, rtd);
-        }
-
         // Full size RT
         {
             var rtd = cameraTextureDescriptor;
-
-            cmd.GetTemporaryRT(colorFullscreenHandle.id, rtd);
-
             rtd.enableRandomWrite = true;
-            cmd.GetTemporaryRT(outputHandle.id, rtd);
+            cmd.GetTemporaryRT(colorFullscreenHandle.id, rtd);
         }
 
         // ### GET ALL LIGHTS IN SCENE ###        
@@ -153,21 +103,10 @@ class DeferredLightsPass : ScriptableRenderPass
         // ### COLOR DOWNSAMPLE ###
         {
             cmd.Blit(colorAttachment, colorFullscreenHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleInputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
-            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleInputKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
-        }
-
-        // ### DEPTH DOWNSAMPLE ###
-        {
-            cmd.Blit(depthAttachment, depthFullscreenHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleDepthKernelID, depthFullscreenID, depthFullscreenHandle.Identifier());
-            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleDepthKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
         }
 
         // ### OUTPUT UPSAMPLE ###
         {
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, colorID, colorHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, outputID, outputHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, lightsID, lightsHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
         }
@@ -177,8 +116,6 @@ class DeferredLightsPass : ScriptableRenderPass
             lightDataBuffer.SetData(lightDatas, 0, 0, lightCount);
             cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
-
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, colorID, colorHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
         }
 
@@ -200,6 +137,7 @@ class DeferredLightsPass : ScriptableRenderPass
         {
             Camera camera = cameraData.camera;
             cmd.SetComputeVectorParam(_lightsCompute, "_CameraPos", camera.transform.position);
+            cmd.SetComputeMatrixParam(_lightsCompute, "MATRIX_IV", camera.cameraToWorldMatrix);
             cmd.SetComputeVectorParam(_lightsCompute, "_ProjectionParams", new Vector4(
                 1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
             ));
@@ -231,7 +169,7 @@ class DeferredLightsPass : ScriptableRenderPass
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, // color
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
 
-            cmd.Blit(outputHandle.id, BuiltinRenderTextureType.CurrentActive);
+            cmd.Blit(colorFullscreenHandle.id, BuiltinRenderTextureType.CurrentActive);
         }
 
         cmd.EndSample("DeferredLightsPass: Execute");
@@ -242,13 +180,8 @@ class DeferredLightsPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        cmd.ReleaseTemporaryRT(outputHandle.id);
         cmd.ReleaseTemporaryRT(lightsHandle.id);
 
-        cmd.ReleaseTemporaryRT(colorHandle.id);
         cmd.ReleaseTemporaryRT(colorFullscreenHandle.id);
-
-        cmd.ReleaseTemporaryRT(depthHandle.id);
-        cmd.ReleaseTemporaryRT(depthFullscreenHandle.id);
     }
 }

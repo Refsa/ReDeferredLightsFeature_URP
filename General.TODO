@@ -1,0 +1,4 @@
+GBufferPass:
+    The context.DrawRenderers with NativeArrays will probably call all the given sub-passes and
+    blit the color into colorAttachments on the pass. This is probably more efficient than having several
+    separate passes
