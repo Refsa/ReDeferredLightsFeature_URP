@@ -3,13 +3,9 @@
 #pragma kernel DownsampleInput
 #pragma kernel ComputeLights
 #pragma kernel DownsampleDepth
-#pragma kernel BlurLightsTexture
-#pragma kernel ClearLightsTexture
 
 // #include "UnityCG.cginc"
 // #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
-
-uint _DebugMode;
 
 float _RenderScale;
 
@@ -190,41 +186,3 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
 
     _DeferredLightsTexture[id.xy] = accLight;
 } 
-
-[numthreads(32,32,1)]
-void BlurLightsTexture (uint3 id : SV_DispatchThreadID)
-{
-    static const float BlurKernel[9] =
-    {
-        1 * rcp(16), 2 * rcp(16), 1 * rcp(16),
-        2 * rcp(16), 4 * rcp(16), 2 * rcp(16),
-        1 * rcp(16), 2 * rcp(16), 1 * rcp(16)
-    };
-
-    float4 Colors[9] = 
-    {
-        _DeferredLightsTexture[id.xy + int2(-1,-1)],
-        _DeferredLightsTexture[id.xy + int2(0,-1)],
-        _DeferredLightsTexture[id.xy + int2(1,-1)],
-        _DeferredLightsTexture[id.xy + int2(-1,0)],
-        _DeferredLightsTexture[id.xy + int2(0,0)],
-        _DeferredLightsTexture[id.xy + int2(1,0)],
-        _DeferredLightsTexture[id.xy + int2(1,1)],
-        _DeferredLightsTexture[id.xy + int2(0,1)],
-        _DeferredLightsTexture[id.xy + int2(-1,1)],
-    };
-
-    _DeferredLightsTexture[id.xy] = 0;
-
-    [unroll]
-    for (int i = 0; i < 9; i++)
-    {
-        _DeferredLightsTexture[id.xy] += Colors[i] * BlurKernel[i];
-    }
-}
-
-[numthreads(32,32,1)]
-void ClearLightsTexture (uint3 id : SV_DispatchThreadID)
-{
-    _DeferredLightsTexture[id.xy] = 0;
-}

@@ -1,4 +1,5 @@
-﻿using Unity.Collections;
+﻿using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -8,11 +9,8 @@ class AlbedoGrabPass : ScriptableRenderPass
 {
     const string ALBEDO_ID = "_AlbedoTexture";
 
-    static ShaderTagId s_ShaderTagLit = new ShaderTagId("Lit");
-    static ShaderTagId s_ShaderTagSimpleLit = new ShaderTagId("SimpleLit");
-    static ShaderTagId s_ShaderTagUnlit = new ShaderTagId("Unlit");
-    static ShaderTagId s_ShaderTagUniversalGBuffer = new ShaderTagId("UniversalGBuffer");
-    static ShaderTagId s_ShaderTagUniversalMaterialType = new ShaderTagId("UniversalMaterialType");
+    static readonly ShaderTagId ShaderTagDepthOnly = new ShaderTagId("DepthOnly");
+    static readonly ShaderTagId ShaderTagUniversalForward = new ShaderTagId("UniversalForward");
 
     RenderTargetHandle albedoHandle;
 
@@ -23,16 +21,16 @@ class AlbedoGrabPass : ScriptableRenderPass
     ComputeShader _lightsCompute;
     Material _albedoGrabMaterial;
 
-    public AlbedoGrabPass(Settings settings, ComputeShader lightsCompute, Material albedoGrabMaterial)
+    public AlbedoGrabPass(Settings settings, Material albedoGrabMaterial)
     {
         _settings = settings;
-        _lightsCompute = lightsCompute;
+        _lightsCompute = ComputeShaderUtils.LightsCompute;
         _albedoGrabMaterial = albedoGrabMaterial;
 
         renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
-        renderStateBlock = new RenderStateBlock();
+        renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
 
         albedoHandle.Init(ALBEDO_ID);
     }
@@ -48,12 +46,14 @@ class AlbedoGrabPass : ScriptableRenderPass
         rtd.height = height;
         rtd.depthBufferBits = 32;
         rtd.msaaSamples = 1;
+        rtd.enableRandomWrite = true;
         cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Point);
 
-        ConfigureTarget(albedoHandle.Identifier());
-        ConfigureClear(ClearFlag.None, Color.black);
+        // ComputeShaderUtils.Utils.DispatchClear(cmd, albedoHandle.Identifier(), width / 32, height / 18, Color.black);
+        // cmd.Blit(colorAttachment, albedoHandle.Identifier());
 
-        cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
+        ConfigureTarget(albedoHandle.Identifier());
+        ConfigureClear(ClearFlag.Color, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -65,10 +65,12 @@ class AlbedoGrabPass : ScriptableRenderPass
         using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Albedo")))
         {
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-            var drawSettings = CreateDrawingSettings(s_ShaderTagUniversalMaterialType, ref renderingData, sortFlags);
-            drawSettings.overrideMaterial = _albedoGrabMaterial;
+            var drawSettings = CreateDrawingSettings(ShaderTagUniversalForward, ref renderingData, sortFlags);
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
+
+            cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);

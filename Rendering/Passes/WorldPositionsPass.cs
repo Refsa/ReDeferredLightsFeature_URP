@@ -19,10 +19,10 @@ class WorldPositionPass : ScriptableRenderPass
     ComputeShader _lightsCompute;
     Material _worldPositionMaterial;
 
-    public WorldPositionPass(Settings settings, ComputeShader lightsCompute, Material worldPositionMaterial)
+    public WorldPositionPass(Settings settings, Material worldPositionMaterial)
     {
         _settings = settings;
-        _lightsCompute = lightsCompute;
+        _lightsCompute = ComputeShaderUtils.LightsCompute;
         _worldPositionMaterial = worldPositionMaterial;
 
         shaderTagId = new ShaderTagId("DepthOnly");
@@ -65,7 +65,7 @@ class WorldPositionPass : ScriptableRenderPass
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_WorldPosition_Texture", wpHandle.Identifier());
         }
 

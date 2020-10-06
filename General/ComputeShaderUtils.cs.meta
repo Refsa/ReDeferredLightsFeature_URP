@@ -1,10 +1,9 @@
 fileFormatVersion: 2
-guid: f2ef94ab5834f18408568b8bac62cf8b
+guid: 9634e111b160d4b43a2e12839159a5e0
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences:
-  - lightsCompute: {fileID: 7200000, guid: 38bc6c56b8f98f642b68379bca6dc287, type: 3}
+  defaultReferences: []
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 

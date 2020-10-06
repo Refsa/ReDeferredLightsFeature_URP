@@ -19,10 +19,10 @@ class DepthNormalsPass : ScriptableRenderPass
     Material _depthNormalsMaterial;
     ComputeShader _lightsCompute;
 
-    public DepthNormalsPass(Settings settings, ComputeShader lightsCompute, Material depthNormalMaterial)
+    public DepthNormalsPass(Settings settings, Material depthNormalMaterial)
     {
         _settings = settings;
-        _lightsCompute = lightsCompute;
+        _lightsCompute = ComputeShaderUtils.LightsCompute;
         _depthNormalsMaterial = depthNormalMaterial;
 
         shaderTagId = new ShaderTagId("DepthOnly");
@@ -65,7 +65,7 @@ class DepthNormalsPass : ScriptableRenderPass
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_DepthNormals_Texture", depthHandle.Identifier());
         }
 

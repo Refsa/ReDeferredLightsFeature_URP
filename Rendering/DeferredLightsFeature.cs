@@ -27,12 +27,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         public static int SizeBytes => 32;
     }
 
-    public static int UpsampleOutputKernelID {get; private set;} = -1;
-    public static int DownsampleInputKernelID {get; private set;} = -1;
-    public static int DownsampleDepthKernelID {get; private set;} = -1;
-    public static int ComputeLightsKernelID {get; private set;} = -1;
-    public static int BlurLightsKernelID {get; private set;} = -1;
-
     DeferredLightsPass lightsPass;
 
     DepthNormalsPass depthNormalsPass;
@@ -48,17 +42,18 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     Material debugMaterial;
 
     [SerializeField] Settings settings;
-    [SerializeField, HideInInspector] ComputeShader lightsCompute;
 
     ComputeBuffer lightsDataBuffer;
 
+    bool error = false;
+ 
     public override void Create()
     {
-        UpsampleOutputKernelID = lightsCompute.FindKernel("UpsampleOutput");
-        DownsampleInputKernelID = lightsCompute.FindKernel("DownsampleInput");
-        ComputeLightsKernelID = lightsCompute.FindKernel("ComputeLights");
-        DownsampleDepthKernelID = lightsCompute.FindKernel("DownsampleDepth");
-        BlurLightsKernelID = lightsCompute.FindKernel("BlurLightsTexture");
+        error = ComputeShaderUtils.Prepare();
+        if (error)
+        {
+            throw new System.Exception("DeferredLightsFeature setup was not successful");
+        }
 
         depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture"); 
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
@@ -67,28 +62,31 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
 
-        worldPositionPass = new WorldPositionPass(settings, lightsCompute, worldPositionMaterial);
-        lightsPass = new DeferredLightsPass(settings, lightsCompute);
-        depthNormalsPass = new DepthNormalsPass(settings, lightsCompute, depthNormalsMaterial);
-        // albedoGrabPass = new AlbedoGrabPass(settings, lightsCompute, albedoGrabMaterial);
+        worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
+        lightsPass = new DeferredLightsPass(settings);
+        depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
+        albedoGrabPass = new AlbedoGrabPass(settings, albedoGrabMaterial);
 
         debugPass = new DebugPass(settings, debugMaterial); 
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        if (error)
+        {
+            return;
+        }
+ 
         lightsPass.SetBuffer(ref lightsDataBuffer);
-        lightsCompute.SetInt("_DebugMode", (int)settings.DebugMode);
 
-        // renderer.EnqueuePass(albedoGrabPass);
-        
+        renderer.EnqueuePass(albedoGrabPass);
         renderer.EnqueuePass(depthNormalsPass);
         renderer.EnqueuePass(worldPositionPass);
         renderer.EnqueuePass(lightsPass);
 
         renderer.EnqueuePass(debugPass);
     }
-
+ 
     void OnDisable() 
     {
         lightsDataBuffer?.Dispose();    
@@ -96,7 +94,23 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
     void OnEnable() 
     {
+        if (error) return;
         lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
+    }
+
+    bool PrepareCompute(string path, ref ComputeShader field)
+    {
+        if (field == null)
+        {
+            field = Resources.Load<ComputeShader>(path);
+        }
+        if (field == null)
+        {
+            UnityEngine.Debug.LogError($"Could not find compute shader at path: {path}");
+            return false;
+        }
+
+        return true;
     }
 }
 

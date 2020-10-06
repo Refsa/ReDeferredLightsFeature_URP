@@ -33,12 +33,12 @@ class DeferredLightsPass : ScriptableRenderPass
     LightData[] lightDatas;
     int lightCount;
 
-    public DeferredLightsPass(Settings settings, ComputeShader lightsCompute)
+    public DeferredLightsPass(Settings settings)
     {
         renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
 
         _settings = settings;
-        _lightsCompute = lightsCompute;
+        _lightsCompute = ComputeShaderUtils.LightsCompute;
 
         // ### SETUP RENDER TEXTURE HANDLES ###
         {
@@ -153,35 +153,33 @@ class DeferredLightsPass : ScriptableRenderPass
         // ### COLOR DOWNSAMPLE ###
         {
             cmd.Blit(colorAttachment, colorFullscreenHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.DownsampleInputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.DownsampleInputKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleInputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
+            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleInputKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
         }
 
         // ### DEPTH DOWNSAMPLE ###
         {
             cmd.Blit(depthAttachment, depthFullscreenHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.DownsampleDepthKernelID, depthFullscreenID, depthFullscreenHandle.Identifier());
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.DownsampleDepthKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleDepthKernelID, depthFullscreenID, depthFullscreenHandle.Identifier());
+            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.DownsampleDepthKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
         }
 
         // ### OUTPUT UPSAMPLE ###
         {
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, colorID, colorHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, outputID, outputHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, lightsID, lightsHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, colorID, colorHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, outputID, outputHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, lightsID, lightsHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
         }
 
         // ### SETUP LIGHT COMPUTE ###
         {
             lightDataBuffer.SetData(lightDatas, 0, 0, lightCount);
             cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
-            cmd.SetComputeBufferParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, "_LightData", lightDataBuffer);
+            cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
 
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, colorID, colorHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
-
-            cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.BlurLightsKernelID, lightsID, lightsHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, colorID, colorHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
         }
 
         cmd.EndSample("DeferredLightsPass: Setup");
@@ -189,7 +187,7 @@ class DeferredLightsPass : ScriptableRenderPass
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
-        CommandBuffer cmd = CommandBufferPool.Get("DeferredLightsFeature");
+        CommandBuffer cmd = CommandBufferPool.Get("DeferredLights");
 
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
@@ -206,26 +204,22 @@ class DeferredLightsPass : ScriptableRenderPass
                 1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
             ));
         }
-
         // ### DISPATCH LIGHT COMPUTE ###
         {
             cmd.BeginSample("DeferredLightsPass: Compute Lights");
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
-            cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
+            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.EndSample("DeferredLightsPass: Compute Lights");
         }
         // ### BLUR LIGHTS TEXTURE ###
         {
             cmd.BeginSample("DeferredLightsPass: Blur Lights");
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.BlurLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
-            cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
+            ComputeShaderUtils.Utils.DispatchGaussianBlur(cmd, lightsHandle.Identifier(), (int)passSize.x / 32, (int)passSize.y / 18);
             cmd.EndSample("DeferredLightsPass: Blur Lights");
         }
         // ### UPSAMPLE LIGHTS TEXTURE ###
         {
             cmd.BeginSample("DeferredLightsPass: Upsample Output");
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
-            cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
+            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.UpsampleOutputKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.EndSample("DeferredLightsPass: Upsample Output");
         }
 

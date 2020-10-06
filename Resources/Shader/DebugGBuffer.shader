@@ -32,8 +32,12 @@
 
             sampler2D _DeferredPass_DepthNormals_Texture;
             float4 _DeferredPass_DepthNormals_Texture_ST;
+
             sampler2D _DeferredPass_WorldPosition_Texture;
             float4 _DeferredPass_WorldPosition_Texture_ST;
+
+            sampler2D _DeferredPass_Albedo_Texture;
+            float4 _DeferredPass_Albedo_Texture_ST;
 
             v2f vert (appdata v)
             {
@@ -53,6 +57,7 @@
                 else if (_DebugMode == 1) return float4(normal, 1.0);
                 else if (_DebugMode == 2) return float4(depth, depth, depth, 1.0);
                 else if (_DebugMode == 3) return tex2D(_DeferredPass_WorldPosition_Texture, i.uv);
+                else if (_DebugMode == 4) return tex2D(_DeferredPass_Albedo_Texture, i.uv);
 
                 return float4(0,0,0,1);
             }

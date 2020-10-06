@@ -1,0 +1,43 @@
+#pragma kernel ClearTexture
+#pragma kernel GaussianBlurTexture
+
+RWTexture2D<float4> _TargetTexture;
+
+float4 _ClearColor;
+[numthreads(32,32,1)]
+void ClearTexture (uint3 id : SV_DispatchThreadID)
+{
+    _TargetTexture[id.xy] = _ClearColor;
+}
+
+[numthreads(32,32,1)]
+void GaussianBlurTexture (uint3 id : SV_DispatchThreadID)
+{
+    static const float BlurKernel[9] =
+    {
+        1 * rcp(16), 2 * rcp(16), 1 * rcp(16),
+        2 * rcp(16), 4 * rcp(16), 2 * rcp(16),
+        1 * rcp(16), 2 * rcp(16), 1 * rcp(16)
+    };
+
+    float4 Colors[9] = 
+    {
+        _TargetTexture[id.xy + int2(-1,-1)],
+        _TargetTexture[id.xy + int2(0,-1)],
+        _TargetTexture[id.xy + int2(1,-1)],
+        _TargetTexture[id.xy + int2(-1,0)],
+        _TargetTexture[id.xy + int2(0,0)],
+        _TargetTexture[id.xy + int2(1,0)],
+        _TargetTexture[id.xy + int2(1,1)],
+        _TargetTexture[id.xy + int2(0,1)],
+        _TargetTexture[id.xy + int2(-1,1)],
+    };
+
+    _TargetTexture[id.xy] = 0;
+
+    [unroll]
+    for (int i = 0; i < 9; i++)
+    {
+        _TargetTexture[id.xy] += Colors[i] * BlurKernel[i];
+    }
+}
