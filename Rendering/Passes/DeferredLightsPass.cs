@@ -4,7 +4,7 @@ using UnityEngine.Rendering.Universal;
 using Settings = DeferredLightsFeature.Settings;
 using LightData = DeferredLightsFeature.LightData;
 
-class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
+class DeferredLightsPass : ScriptableRenderPass
 {
     const string lightsID = "_DeferredLightsTexture";
     const string outputID = "_DeferredOutputTexture";
@@ -31,6 +31,7 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
 
     ComputeBuffer lightDataBuffer;
     LightData[] lightDatas;
+    int lightCount;
 
     public DeferredLightsPass(Settings settings, ComputeShader lightsCompute)
     {
@@ -52,12 +53,22 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
         }
 
         PrepareBuffers();
+    } 
+ 
+    public void PrepareBuffers() 
+    {
+        // if (lightDataBuffer == null)
+        // {
+        //     lightDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
+        //     UnityEngine.Debug.Log($"wat");
+        // }
+
+        lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
     }
 
-    public void PrepareBuffers()
+    public void SetBuffer(ref ComputeBuffer lightsBuffer)
     {
-        lightDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
-        lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
+        lightDataBuffer = lightsBuffer;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -76,11 +87,19 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
             rtd.colorFormat = cameraTextureDescriptor.colorFormat;
             rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(colorHandle.id, rtd);
+        }
 
-            rtd.width = 2048;
-            rtd.height = 2048;
-            rtd.colorFormat = RenderTextureFormat.DefaultHDR;
+        // Lights RT
+        {
+            RenderTextureDescriptor rtd = new RenderTextureDescriptor(width, height);
+
+            int size = 2048;
+            if (width > size) size = 4096;
+            rtd.width = size;
+            rtd.height = size;
+            rtd.colorFormat = RenderTextureFormat.ARGBFloat;
             rtd.depthBufferBits = 0;
+            rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(lightsHandle.id, rtd);
         }
 
@@ -111,19 +130,18 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
             cmd.GetTemporaryRT(outputHandle.id, rtd);
         }
 
-        // ### GET ALL LIGHTS IN SCENE ###
-        int ldIndex = 0;
+        // ### GET ALL LIGHTS IN SCENE ###        
+        lightCount = 0;
         foreach (var ld in GameObject.FindObjectsOfType<DeferredLightsData>())
         {
-            lightDatas[ldIndex].Position = ld.transform.position;
-            lightDatas[ldIndex].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
-            lightDatas[ldIndex].Intensity = ld.Intensity;
-            lightDatas[ldIndex].Range = ld.Range;
+            lightDatas[lightCount].Position = ld.transform.position;
+            lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
+            lightDatas[lightCount].Intensity = ld.Intensity;
+            lightDatas[lightCount].Range = ld.Range;
 
-            ldIndex++;
+            lightCount++;
         }
-
-        // UnityEngine.Debug.Log($"{ldIndex}");
+        // UnityEngine.Debug.Log($"{lightCount}");
 
         // ### COMPUTE GLOBALS ###
         {
@@ -136,7 +154,7 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
         {
             cmd.Blit(colorAttachment, colorFullscreenHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.DownsampleInputKernelID, colorFullscreenID, colorFullscreenHandle.Identifier());
-            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.DownsampleInputKernelID, (int)renderSize.x / 32, (int)renderSize.y / 32, 1);
+            cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.DownsampleInputKernelID, (int)renderSize.x / 32, (int)renderSize.y / 18, 1);
         }
 
         // ### DEPTH DOWNSAMPLE ###
@@ -156,8 +174,8 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
 
         // ### SETUP LIGHT COMPUTE ###
         {
-            lightDataBuffer.SetData(lightDatas, 0, 0, ldIndex);
-            cmd.SetComputeIntParam(_lightsCompute, "_LightCount", ldIndex);
+            lightDataBuffer.SetData(lightDatas, 0, 0, lightCount);
+            cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
             cmd.SetComputeBufferParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, "_LightData", lightDataBuffer);
 
             cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, colorID, colorHandle.Identifier());
@@ -189,18 +207,22 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
             ));
         }
 
-        // ### DISPATCH LIGHT AND UPSAMPLE COMPUTE ###
+        // ### DISPATCH LIGHT COMPUTE ###
         {
             cmd.BeginSample("DeferredLightsPass: Compute Lights");
             cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
             cmd.EndSample("DeferredLightsPass: Compute Lights");
-
+        }
+        // ### BLUR LIGHTS TEXTURE ###
+        {
             cmd.BeginSample("DeferredLightsPass: Blur Lights");
             cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.BlurLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
             cmd.EndSample("DeferredLightsPass: Blur Lights");
-
+        }
+        // ### UPSAMPLE LIGHTS TEXTURE ###
+        {
             cmd.BeginSample("DeferredLightsPass: Upsample Output");
             cmd.DispatchCompute(_lightsCompute, DeferredLightsFeature.UpsampleOutputKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
@@ -208,25 +230,14 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
         }
 
         // ### BLIT RESULTS BACK INTO RENDER BUFFER ###
-        RenderTargetIdentifier cameraTarget =
-            (cameraData.targetTexture != null) ?
-                new RenderTargetIdentifier(cameraData.targetTexture)
-                : BuiltinRenderTextureType.CurrentActive;
-
-        if (cameraData.isSceneViewCamera || cameraData.isDefaultViewport)
+        if (cameraData.isDefaultViewport)
         {
             cmd.SetRenderTarget(
                 BuiltinRenderTextureType.CurrentActive,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, // color
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
+
             cmd.Blit(outputHandle.id, BuiltinRenderTextureType.CurrentActive);
-        }
-        else
-        {
-            // CoreUtils.SetRenderTarget(cmd, cameraTarget);
-            // CoreUtils.ClearRenderTarget(cmd, ClearFlag.All, Color.black);
-// 
-            // cmd.Blit(outputHandle.id, cameraTarget);
         }
 
         cmd.EndSample("DeferredLightsPass: Execute");
@@ -245,10 +256,5 @@ class DeferredLightsPass : ScriptableRenderPass, System.IDisposable
 
         cmd.ReleaseTemporaryRT(depthHandle.id);
         cmd.ReleaseTemporaryRT(depthFullscreenHandle.id);
-    }
-
-    public void Dispose()
-    {
-        CoreUtils.SafeRelease(lightDataBuffer);
     }
 }

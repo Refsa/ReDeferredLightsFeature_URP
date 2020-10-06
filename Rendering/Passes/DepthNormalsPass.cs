@@ -66,6 +66,7 @@ class DepthNormalsPass : ScriptableRenderPass
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(_lightsCompute, DeferredLightsFeature.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
+            cmd.SetGlobalTexture("_DeferredPass_DepthNormals_Texture", depthHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);

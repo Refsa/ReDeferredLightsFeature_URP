@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class DeferredLightsData : MonoBehaviour
 {
-    [SerializeField, ColorUsage(true, true)] Color color = Color.red;
+    [SerializeField] Color color = Color.red;
     [SerializeField] float intensity = 1f;
     [SerializeField] float range = 3f;
 
@@ -14,7 +14,7 @@ public class DeferredLightsData : MonoBehaviour
 
     public Color Color => color;
     public float Intensity => Mathf.Exp(-intensity);
-    public float Range => range;
+    public float Range => range * range;
     // public float Range => Mathf.Pow(range, 2);
 
     void Awake()

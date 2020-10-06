@@ -10,7 +10,7 @@ public class RotateInCircle : MonoBehaviour
     void Awake()
     {
         center = transform.position + Vector3.right * Random.Range(-10f, 10f);
-        speed = Random.Range(-25f, 25f);
+        speed = Random.Range(-10f, 10f);
     }
 
     void Update()

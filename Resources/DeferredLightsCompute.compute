@@ -1,0 +1,230 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UpsampleOutput
+#pragma kernel DownsampleInput
+#pragma kernel ComputeLights
+#pragma kernel DownsampleDepth
+#pragma kernel BlurLightsTexture
+#pragma kernel ClearLightsTexture
+
+// #include "UnityCG.cginc"
+// #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
+
+uint _DebugMode;
+
+float _RenderScale;
+
+float2 _InputSize;
+RWTexture2D<float4> _DeferredColorTexture;
+RWTexture2D<float4> _DeferredLightsTexture;
+
+float2 _OutputSize;
+RWTexture2D<float4> _DeferredOutputTexture;
+Texture2D<float4> _DownsampleColorInput;
+
+[numthreads(32,32,1)]
+void UpsampleOutput (uint3 id : SV_DispatchThreadID)
+{
+    const uint2 diff = ceil(_OutputSize * rcp(_InputSize));
+
+    float4 light = _DeferredLightsTexture[id.xy];
+    float3 lightStrength = light.rgb * light.a;
+
+    uint2 samplePos = 0;
+    float4 colSample = 0;
+
+    for (uint i = 0; i < diff.x; i++)
+    {
+        for (uint j = 0; j < diff.y; j++)
+        {
+            samplePos = id.xy * rcp(_RenderScale) + uint2(i, j);
+
+            colSample = _DownsampleColorInput[samplePos];
+            colSample.rgb += lightStrength;
+
+            _DeferredOutputTexture[samplePos] = colSample;
+        }
+    }
+}
+
+[numthreads(32,32,1)]
+void DownsampleInput (uint3 id : SV_DispatchThreadID)
+{
+    static const float3x3 DownsampleKernel =
+        float3x3(
+            0.015625, 0.046875, 0.015625,
+            0.046875, 0.75, 0.046875,
+            0.015625, 0.046875, 0.015625
+        );
+
+    _DeferredColorTexture[id.xy * _RenderScale] = 0;
+
+    int2 offset = 0;
+
+    [unroll]
+    for (int i = -1; i <= 1; i++)
+    {
+        [unroll]
+        for (int j = -1; j <= 1; j++)
+        {
+            offset.x = i; offset.y = j;
+            _DeferredColorTexture[id.xy * _RenderScale] += _DownsampleColorInput[id.xy + offset] * DownsampleKernel[offset.x + 1][offset.y + 1];
+        }
+    }
+}
+
+// ###########################
+// #### LIGHTS START HERE ####
+// ###########################
+
+struct LightData
+{
+    float3 Position;
+    float3 Color;
+    float Intensity;
+    float Range;
+};
+
+StructuredBuffer<LightData> _LightData;
+uint _LightCount;
+float4x4 _MVP;
+float3 _CameraPos;
+
+cbuffer LightData2
+{
+    float3 Position;
+    float3 Color;
+    float Intensity;
+    float Range;
+};
+
+RWTexture2D<float> _DepthTexture;
+Texture2D<float> _DownsampleDepthInput;
+
+[numthreads(32,32,1)]
+void DownsampleDepth (uint3 id : SV_DispatchThreadID)
+{
+    _DepthTexture[id.xy * _RenderScale] = _DownsampleDepthInput[id.xy].r;
+}
+
+Texture2D<float4> _AlbedoTexture;
+Texture2D<float4> _DepthNormalsTexture;
+Texture2D<float4> _WorldPositionsTexture;
+
+float3 DecodeNormal(float4 enc)
+{
+    float kScale = 1.7777;
+    float3 nn = enc.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
+    float g = 2.0 / dot(nn.xyz,nn.xyz);
+    float3 n;
+    n.xy = g*nn.xy;
+    n.z = g-1;
+    return n;
+}
+
+inline float Luminance(float3 linearRgb)
+{
+    return dot(linearRgb, float3(0.2126729, 0.7151522, 0.0721750));
+}
+
+[numthreads(32,18,1)]
+void ComputeLights (uint3 id : SV_DispatchThreadID)
+{
+    // float4 depthNormal = _DepthNormalsTexture[id.xy];
+    // float3 normal = DecodeNormal(depthNormal);
+    // float depth = _DepthTexture[id.xy].r;
+    float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+
+    const uint validPos = (dot(worldPos, worldPos) != 0);
+    const uint maxLights = _LightCount * validPos;
+
+    float4 accLight = 0, col = 0;
+    float3 ldir = 0;
+    float atten = 0, intensity = 0, dist = 0;
+    LightData ld = (LightData)0;
+
+    // const uint batchCount = 32;
+    // uint batches = maxLights / batchCount;
+
+    // [unroll]
+    // for (uint j = 0; j < batchCount; j++)
+    // {
+    //     uint curr = j * batches;
+    //     [loop]
+    //     for (uint i = curr; i < curr + batches; i++)
+    //     {
+    //         ld = _LightData[i];
+         
+    //         ldir = (worldPos - ld.Position);
+    //         dist = dot(ldir, ldir);
+
+    //         [branch] if (dist > ld.Range) continue;
+
+    //         atten = smoothstep(0, ld.Range, ld.Range - dist);
+    //         intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
+
+    //         col.rgb = ld.Color * intensity;
+    //         col.a = intensity;
+
+    //         accLight += col;
+    //     }
+    // }
+
+    [loop]
+    for (uint i = 0; i < maxLights; i++)
+    {
+        ld = _LightData[i];
+         
+        ldir = (worldPos - ld.Position);
+        dist = dot(ldir, ldir);
+
+        [branch] if (dist > ld.Range) continue;
+
+        atten = smoothstep(0, ld.Range, ld.Range - dist);
+        intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
+
+        col.rgb = ld.Color * intensity;
+        col.a = intensity;
+
+        accLight += col;
+    }
+
+    _DeferredLightsTexture[id.xy] = accLight;
+} 
+
+[numthreads(32,32,1)]
+void BlurLightsTexture (uint3 id : SV_DispatchThreadID)
+{
+    static const float BlurKernel[9] =
+    {
+        1 * rcp(16), 2 * rcp(16), 1 * rcp(16),
+        2 * rcp(16), 4 * rcp(16), 2 * rcp(16),
+        1 * rcp(16), 2 * rcp(16), 1 * rcp(16)
+    };
+
+    float4 Colors[9] = 
+    {
+        _DeferredLightsTexture[id.xy + int2(-1,-1)],
+        _DeferredLightsTexture[id.xy + int2(0,-1)],
+        _DeferredLightsTexture[id.xy + int2(1,-1)],
+        _DeferredLightsTexture[id.xy + int2(-1,0)],
+        _DeferredLightsTexture[id.xy + int2(0,0)],
+        _DeferredLightsTexture[id.xy + int2(1,0)],
+        _DeferredLightsTexture[id.xy + int2(1,1)],
+        _DeferredLightsTexture[id.xy + int2(0,1)],
+        _DeferredLightsTexture[id.xy + int2(-1,1)],
+    };
+
+    _DeferredLightsTexture[id.xy] = 0;
+
+    [unroll]
+    for (int i = 0; i < 9; i++)
+    {
+        _DeferredLightsTexture[id.xy] += Colors[i] * BlurKernel[i];
+    }
+}
+
+[numthreads(32,32,1)]
+void ClearLightsTexture (uint3 id : SV_DispatchThreadID)
+{
+    _DeferredLightsTexture[id.xy] = 0;
+}

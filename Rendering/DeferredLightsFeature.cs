@@ -4,9 +4,9 @@ using UnityEngine.Rendering.Universal;
 
 public class DeferredLightsFeature : ScriptableRendererFeature
 {
-    public const int MAX_LIGHTS = 1 << 16;
+    public const int MAX_LIGHTS = 1 << 12;
 
-    public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3 };
+    public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3, Albedo = 4 };
 
     [System.Serializable]
     public class Settings
@@ -41,8 +41,16 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     WorldPositionPass worldPositionPass;
     Material worldPositionMaterial;
 
+    AlbedoGrabPass albedoGrabPass;
+    Material albedoGrabMaterial;
+
+    DebugPass debugPass;
+    Material debugMaterial;
+
     [SerializeField] Settings settings;
     [SerializeField, HideInInspector] ComputeShader lightsCompute;
+
+    ComputeBuffer lightsDataBuffer;
 
     public override void Create()
     {
@@ -52,36 +60,43 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         DownsampleDepthKernelID = lightsCompute.FindKernel("DownsampleDepth");
         BlurLightsKernelID = lightsCompute.FindKernel("BlurLightsTexture");
 
-        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture");
+        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture"); 
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
+        albedoGrabMaterial = new Material(Shader.Find("Hidden/GrabAlbedo"));
+        debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
-        depthNormalsPass = new DepthNormalsPass(settings, lightsCompute, depthNormalsMaterial);
+        lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
+
         worldPositionPass = new WorldPositionPass(settings, lightsCompute, worldPositionMaterial);
         lightsPass = new DeferredLightsPass(settings, lightsCompute);
+        depthNormalsPass = new DepthNormalsPass(settings, lightsCompute, depthNormalsMaterial);
+        // albedoGrabPass = new AlbedoGrabPass(settings, lightsCompute, albedoGrabMaterial);
+
+        debugPass = new DebugPass(settings, debugMaterial); 
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        lightsPass.SetBuffer(ref lightsDataBuffer);
         lightsCompute.SetInt("_DebugMode", (int)settings.DebugMode);
 
+        // renderer.EnqueuePass(albedoGrabPass);
+        
         renderer.EnqueuePass(depthNormalsPass);
         renderer.EnqueuePass(worldPositionPass);
         renderer.EnqueuePass(lightsPass);
+
+        renderer.EnqueuePass(debugPass);
     }
 
-    void OnDestroy()
+    void OnDisable() 
     {
-        lightsPass?.Dispose();
+        lightsDataBuffer?.Dispose();    
     }
 
-    void OnEnable()
+    void OnEnable() 
     {
-        lightsPass?.PrepareBuffers();
-    }
-
-    void OnDisable()
-    {
-        lightsPass?.Dispose();
+        lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
     }
 }
 
