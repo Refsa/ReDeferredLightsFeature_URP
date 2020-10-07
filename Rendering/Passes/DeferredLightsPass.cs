@@ -19,6 +19,8 @@ class DeferredLightsPass : ScriptableRenderPass
     Vector2 renderSize;
 
     ComputeBuffer lightDataBuffer;
+    ComputeBuffer pixelDataBuffer;
+
     LightData[] lightDatas;
     int lightCount;
 
@@ -44,9 +46,10 @@ class DeferredLightsPass : ScriptableRenderPass
         lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
     }
 
-    public void SetBuffer(ref ComputeBuffer lightsBuffer)
+    public void SetBuffer(ref ComputeBuffer lightsBuffer, ref ComputeBuffer pixelDataBuffer)
     {
-        lightDataBuffer = lightsBuffer;
+        this.lightDataBuffer = lightsBuffer;
+        this.pixelDataBuffer = pixelDataBuffer;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -116,6 +119,9 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
+
+            cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, "_PixelData", pixelDataBuffer);
+            cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_PixelData", pixelDataBuffer);
         }
 
         cmd.EndSample("DeferredLightsPass: Setup");
@@ -141,12 +147,19 @@ class DeferredLightsPass : ScriptableRenderPass
                 1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
             ));
         }
+        // ### PRE-COMPUTE PIXEL DATA ###
+        {
+            cmd.BeginSample("DeferredLightsPass: Pre Compute Pixel Data");
+            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
+            cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
+            cmd.EndSample("DeferredLightsPass: Pre Compute Pixel Data");
+        }
         // ### DISPATCH LIGHT COMPUTE ###
         {
             cmd.BeginSample("DeferredLightsPass: Compute Lights");
             cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
             cmd.EndSample("DeferredLightsPass: Compute Lights");
-        }
+        } 
         // ### BLUR LIGHTS TEXTURE ###
         {
             cmd.BeginSample("DeferredLightsPass: Blur Lights");

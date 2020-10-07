@@ -22,9 +22,21 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         public Vector3 Position;
         public Vector3 Color;
         public Vector2 Attenuation;
-
-        public static int SizeBytes => 32;
     }
+
+    public struct PixelData
+    {
+        public Vector3 Diffuse;
+        public Vector3 Normal;
+        public float Depth;
+        public Vector3 ViewDir;
+        public Vector3 Position;
+        public Vector3 Specular;
+        public float Roughness;
+        public float Roughness2;
+        public float Roughness2MinusOne;
+        public float NormalizationTerm;
+    };
 
     DeferredLightsPass lightsPass;
 
@@ -44,9 +56,10 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     [SerializeField] Settings settings;
 
     ComputeBuffer lightsDataBuffer;
+    ComputeBuffer pixelDataBuffer;
 
     bool error = false;
- 
+
     public override void Create()
     {
         error = ComputeShaderUtils.Prepare();
@@ -55,11 +68,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             throw new System.Exception("DeferredLightsFeature setup was not successful");
         }
 
-        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture"); 
+        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture");
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
-        lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
+        lightsDataBuffer = new ComputeBuffer(MAX_LIGHTS, System.Runtime.InteropServices.Marshal.SizeOf<LightData>());
+        pixelDataBuffer = new ComputeBuffer(2560*1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
 
         worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
         lightsPass = new DeferredLightsPass(settings);
@@ -67,7 +81,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         albedoGrabPass = new AlbedoGrabPass(settings);
         specularGrabPass = new SpecularGrabPass(settings);
 
-        debugPass = new DebugPass(settings, debugMaterial); 
+        debugPass = new DebugPass(settings, debugMaterial);
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -76,8 +90,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         {
             return;
         }
- 
-        lightsPass.SetBuffer(ref lightsDataBuffer);
+
+        lightsPass.SetBuffer(ref lightsDataBuffer, ref pixelDataBuffer);
 
         renderer.EnqueuePass(albedoGrabPass);
         renderer.EnqueuePass(depthNormalsPass);
@@ -87,16 +101,18 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         renderer.EnqueuePass(debugPass);
     }
- 
-    void OnDisable() 
+
+    void OnDisable()
     {
-        lightsDataBuffer?.Dispose();    
+        lightsDataBuffer?.Dispose();
+        pixelDataBuffer?.Dispose();
     }
 
-    void OnEnable() 
+    void OnEnable()
     {
         if (error) return;
-        lightsDataBuffer = new ComputeBuffer(DeferredLightsFeature.MAX_LIGHTS, LightData.SizeBytes);
+        lightsDataBuffer = new ComputeBuffer(MAX_LIGHTS, System.Runtime.InteropServices.Marshal.SizeOf<LightData>());
+        pixelDataBuffer = new ComputeBuffer(2560*1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
     }
 
     bool PrepareCompute(string path, ref ComputeShader field)

@@ -118,41 +118,25 @@ inline float DecodeFloatRG( float2 enc )
     return dot( enc, kDecodeDot );
 }
 
-inline float3 LightingSpecular_float(float3 lightColor, float3 lightDir, float3 normal, float3 viewDir, float3 specular, float smoothness)
+inline float3 DirectBRDF_float(PixelData pd, float3 lightDir)
 {
-    float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
-    float NdotH = remap(saturate(dot(normal, halfVec)));
-    float modifier = pow(NdotH, smoothness);
-    float3 specularReflection = specular * modifier;
-    return lightColor * specularReflection;
-}
-
-inline float3 DirectBRDF_float(float roughness, float3 specular, float3 diffuse, float3 normal, float3 lightDir, float3 viewDir)
-{
-    float normalizationTerm = roughness * 4.0 + 2.0;
-    float roughness2 = roughness * roughness;
-    float roughness2MinusOne = roughness2 - 1.0;
-
-    float3 halfDir = normalize(lightDir + viewDir);
-    float NoH = remap(saturate(dot(normal, halfDir)));
+    float3 halfDir = normalize(lightDir + pd.ViewDir);
+    float NoH = remap(saturate(dot(pd.Normal, halfDir)));
     float LoH = remap(saturate(dot(lightDir, halfDir)));
 
-    float d = NoH * NoH * roughness2MinusOne * 1.00001;
+    float d = NoH * NoH * pd.Roughness2MinusOne * 1.00001;
     float LoH2 = LoH * LoH;
-    float specularTerm = roughness2 / ((d * d) * max(0.1, LoH2) * normalizationTerm);
+    float specularTerm = pd.Roughness2 / ((d * d) * max(0.1, LoH2) * pd.NormalizationTerm);
 
-    float3 color = specularTerm * specular + diffuse;
+    float3 color = specularTerm * pd.Specular + pd.Diffuse;
     return color;
 }
 
-inline float3 LightingPhysicallyBased_float(
-    float3 lightColor, float attenuation, float roughness, float3 specular, 
-    float3 diffuse, float3 normal, float3 lightDir, float3 viewDir
-)
+inline float3 LightingPhysicallyBased_float(PixelData pd, float attenuation, float3 lightDir, float3 lightCol)
 {
-    float NdotL = remap(saturate(dot(normal, lightDir)));
-    float3 radiance = lightColor * (attenuation * NdotL);
-    return DirectBRDF_float(roughness, specular, diffuse, normal, lightDir, viewDir) * radiance;
+    float NdotL = remap(saturate(dot(pd.Normal, lightDir)));
+    float3 radiance = lightCol * (attenuation * NdotL);
+    return DirectBRDF_float(pd, lightDir) * radiance;
 }
 
 inline float DistanceAttenuation(float distSqr, float2 distAtten) 
@@ -166,31 +150,27 @@ inline float DistanceAttenuation(float distSqr, float2 distAtten)
     return lightAtten * smoothFactor;
 }
 
-[numthreads(32,18,1)]
+inline uint TextureSpaceToArray(uint2 id)
+{
+    return id.x + _InputSize.x * id.y;
+}
+ 
+[numthreads(32,32,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
-    float4 depthNormal = _DepthNormalsTexture[id.xy];
-    float4 specular = _SpecularTexture[id.xy];
-    float3 albedo = _AlbedoTexture[id.xy].rgb;
+    PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
 
-    float depth = DecodeFloatRG(depthNormal.zw);
-    float3 normal = DecodeNormal(depthNormal);
-    normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+    float3 worldPos = pd.Position;
 
-    float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
-
-    const uint validPos = (dot(worldPos, worldPos) != 0);
-    const uint maxLights = _LightCount * validPos;
+    uint validPos = (length(worldPos) != 0);
 
     float4 accLight = 0, col = 0;
-    float3 ldir = 0, vdir = 0;
+    float3 ldir = 0;
     float atten = 0, intensity = 0, dist = 0;
     DFLightData ld = (DFLightData)0;
-    
-    vdir = normalize(_CameraPos - worldPos);
-
+     
     [loop]
-    for (uint i = 0; i < maxLights; i++)
+    for (uint i = 0; i < _LightCount * validPos; i++)
     {
         ld = _LightData[i];
          
@@ -203,7 +183,7 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
 
         atten = DistanceAttenuation(dist, ld.Attenuation);
 
-        col.rgb = LightingPhysicallyBased_float(ld.Color, atten, specular.w, specular.rgb, albedo, normal, ldir, vdir);
+        col.rgb = LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
         col.a = 0.1;
 
         accLight += col;
@@ -211,11 +191,6 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
 
     _DeferredLightsTexture[id.xy] = accLight;
 } 
-
-inline uint TextureSpaceToArray(uint2 id)
-{
-    return id.x * _InputSize.x + id.y;
-}
 
 [numthreads(32, 32, 1)]
 void ComputePixelData(uint3 id : SV_DispatchThreadID)
@@ -229,38 +204,27 @@ void ComputePixelData(uint3 id : SV_DispatchThreadID)
     normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
 
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+    float3 vdir = normalize(_CameraPos - worldPos);
 
-    const uint validPos = (dot(worldPos, worldPos) != 0);
-    const uint maxLights = _LightCount * validPos;
+    uint validPos = (dot(worldPos, worldPos) != 0);
 
-    float4 accLight = 0, col = 0;
-    float3 ldir = 0, vdir = 0;
-    float atten = 0, intensity = 0, dist = 0;
-    DFLightData ld = (DFLightData)0;
+    float roughness = specular.w;
+    float normalizationTerm = roughness * 4.0 + 2.0;
+    float roughness2 = roughness * roughness;
+    float roughness2MinusOne = roughness2 - 1.0;
+
+    PixelData pd;
     
-    vdir = normalize(_CameraPos - worldPos);
+    pd.Diffuse = albedo;
+    pd.Normal = normal;
+    pd.Depth = depth;
+    pd.ViewDir = vdir;
+    pd.Position = worldPos * validPos;
+    pd.Specular = specular.rgb;
+    pd.Roughness = roughness;
+    pd.Roughness2 = roughness2;
+    pd.Roughness2MinusOne = roughness2MinusOne;
+    pd.NormalizationTerm = normalizationTerm;
 
-    [loop]
-    for (uint i = 0; i < maxLights; i++)
-    {
-        float roughness = specular.w;
-        float normalizationTerm = roughness * 4.0 + 2.0;
-        float roughness2 = roughness * roughness;
-        float roughness2MinusOne = roughness2 - 1.0;
-
-        PixelData pd;
-
-        pd.Diffuse = albedo;
-        pd.Normal = normal;
-        pd.Depth = depth;
-        pd.ViewDir = vdir;
-        pd.Position = worldPos;
-        pd.Specular = specular.rgb;
-        pd.Roughness = roughness;
-        pd.Roughness2 = roughness2;
-        pd.Roughness2MinusOne = roughness2MinusOne;
-        pd.NormalizationTerm = normalizationTerm;
-
-        _PixelData[TextureSpaceToArray(id.xy)] = pd;
-    }
+    _PixelData[TextureSpaceToArray(id.xy)] = pd;
 }

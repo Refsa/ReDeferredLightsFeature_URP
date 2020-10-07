@@ -63,8 +63,8 @@ class SpecularGrabPass : ScriptableRenderPass
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, Specular_ID, specularHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_Specular_Texture", specularHandle.Identifier());
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, Specular_ID, specularHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);
