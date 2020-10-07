@@ -1,6 +1,7 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel UpsampleOutput
 #pragma kernel ComputeLights
+#pragma kernel ComputePixelData
 
 // #include "UnityCG.cginc"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl" 
@@ -51,13 +52,27 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
 // ###########################
 // #### LIGHTS START HERE ####
 // ###########################
+struct PixelData
+{
+    float3 Diffuse;
+    float3 Normal;
+    float Depth;
+    float3 ViewDir;
+    float3 Position;
+    float3 Specular;
+    float Roughness;
+    float Roughness2;
+    float Roughness2MinusOne;
+    float NormalizationTerm;
+};
+
+RWStructuredBuffer<PixelData> _PixelData; 
 
 struct DFLightData
 {
     float3 Position;
     float3 Color;
-    float Intensity;
-    float Range;
+    float2 Attenuation;
 };
 
 StructuredBuffer<DFLightData> _LightData;
@@ -66,7 +81,27 @@ float4x4 _MVP;
 float4x4 MATRIX_IV;
 float3 _CameraPos;
 
-float3 DecodeNormal(float4 enc)
+inline float3 WorldToViewPos(float3 pos)
+{
+    return mul(transpose(MATRIX_IV), float4(pos, 1.0)).xyz;
+}
+
+inline float WorldTo01Depth(float3 pos)
+{
+    return -(WorldToViewPos(pos).z * _ProjectionParams.w);
+}
+
+inline float WorldToEyeDepth(float3 pos)
+{
+    return -(WorldToViewPos(pos).z);
+}
+
+inline float remap(float s) 
+{
+    return (s + 1.0) / 2.0;
+}
+
+inline float3 DecodeNormal(float4 enc)
 {
     float kScale = 1.7777;
     float3 nn = enc.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
@@ -77,19 +112,71 @@ float3 DecodeNormal(float4 enc)
     return n;
 }
 
-// inline float Luminance(float3 linearRgb)
-// {
-//     return dot(linearRgb, float3(0.2126729, 0.7151522, 0.0721750));
-// }
+inline float DecodeFloatRG( float2 enc )
+{
+    float2 kDecodeDot = float2(1.0, 1/255.0);
+    return dot( enc, kDecodeDot );
+}
+
+inline float3 LightingSpecular_float(float3 lightColor, float3 lightDir, float3 normal, float3 viewDir, float3 specular, float smoothness)
+{
+    float3 halfVec = SafeNormalize(float3(lightDir) + float3(viewDir));
+    float NdotH = remap(saturate(dot(normal, halfVec)));
+    float modifier = pow(NdotH, smoothness);
+    float3 specularReflection = specular * modifier;
+    return lightColor * specularReflection;
+}
+
+inline float3 DirectBRDF_float(float roughness, float3 specular, float3 diffuse, float3 normal, float3 lightDir, float3 viewDir)
+{
+    float normalizationTerm = roughness * 4.0 + 2.0;
+    float roughness2 = roughness * roughness;
+    float roughness2MinusOne = roughness2 - 1.0;
+
+    float3 halfDir = normalize(lightDir + viewDir);
+    float NoH = remap(saturate(dot(normal, halfDir)));
+    float LoH = remap(saturate(dot(lightDir, halfDir)));
+
+    float d = NoH * NoH * roughness2MinusOne * 1.00001;
+    float LoH2 = LoH * LoH;
+    float specularTerm = roughness2 / ((d * d) * max(0.1, LoH2) * normalizationTerm);
+
+    float3 color = specularTerm * specular + diffuse;
+    return color;
+}
+
+inline float3 LightingPhysicallyBased_float(
+    float3 lightColor, float attenuation, float roughness, float3 specular, 
+    float3 diffuse, float3 normal, float3 lightDir, float3 viewDir
+)
+{
+    float NdotL = remap(saturate(dot(normal, lightDir)));
+    float3 radiance = lightColor * (attenuation * NdotL);
+    return DirectBRDF_float(roughness, specular, diffuse, normal, lightDir, viewDir) * radiance;
+}
+
+inline float DistanceAttenuation(float distSqr, float2 distAtten) 
+{
+    float lightAtten = rcp(distSqr);
+
+    float factor = distSqr * distAtten.x;
+    float smoothFactor = saturate(1.0 - factor * factor);
+    smoothFactor = smoothFactor * smoothFactor;
+
+    return lightAtten * smoothFactor;
+}
 
 [numthreads(32,18,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
 {
     float4 depthNormal = _DepthNormalsTexture[id.xy];
     float4 specular = _SpecularTexture[id.xy];
-    float3 albedo = _AlbedoTexture[id.xy];
+    float3 albedo = _AlbedoTexture[id.xy].rgb;
+
+    float depth = DecodeFloatRG(depthNormal.zw);
     float3 normal = DecodeNormal(depthNormal);
-    normal = mul(MATRIX_IV, float4(normal, 0));
+    normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
     const uint validPos = (dot(worldPos, worldPos) != 0);
@@ -99,25 +186,6 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
     float3 ldir = 0, vdir = 0;
     float atten = 0, intensity = 0, dist = 0;
     DFLightData ld = (DFLightData)0;
-
-    // [loop]
-    // for (uint i = 0; i < maxLights; i++)
-    // {
-    //     ld = _LightData[i];
-         
-    //     ldir = (worldPos - ld.Position);
-    //     dist = dot(ldir, ldir);
-
-    //     [branch] if (dist > ld.Range) continue;
-
-    //     atten = smoothstep(0, ld.Range, ld.Range - dist);
-    //     intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
-
-    //     col.rgb = ld.Color * intensity;
-    //     col.a = intensity;
-
-    //     accLight += col;
-    // }
     
     vdir = normalize(_CameraPos - worldPos);
 
@@ -128,25 +196,71 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
          
         ldir = (ld.Position - worldPos);
         dist = dot(ldir, ldir);
-
-        [branch] if (dist > ld.Range) continue;
-
         ldir = normalize(ldir);
 
-        float3 halfVec = normalize(vdir + ldir);
-        half NdotH = saturate(dot(normal, halfVec));
-        half modifier = pow(NdotH, specular.w);
-        half3 specRef = specular.rgb * modifier;
+        // float ldepth = WorldToEyeDepth(ld.Position);
+        // if (ldepth > depth) continue;
 
-        atten = smoothstep(0, ld.Range, ld.Range - dist);
-        intensity = rcp(Luminance(ld.Color * ld.Intensity) + 1) * atten;
+        atten = DistanceAttenuation(dist, ld.Attenuation);
 
-        col.rgb = albedo + specRef * ld.Color;
-
-        col.a = sqrt(0.01 * atten * rcp(ld.Intensity));
+        col.rgb = LightingPhysicallyBased_float(ld.Color, atten, specular.w, specular.rgb, albedo, normal, ldir, vdir);
+        col.a = 0.1;
 
         accLight += col;
     }
 
     _DeferredLightsTexture[id.xy] = accLight;
 } 
+
+inline uint TextureSpaceToArray(uint2 id)
+{
+    return id.x * _InputSize.x + id.y;
+}
+
+[numthreads(32, 32, 1)]
+void ComputePixelData(uint3 id : SV_DispatchThreadID)
+{
+    float4 depthNormal = _DepthNormalsTexture[id.xy];
+    float4 specular = _SpecularTexture[id.xy];
+    float3 albedo = _AlbedoTexture[id.xy].rgb;
+
+    float depth = DecodeFloatRG(depthNormal.zw);
+    float3 normal = DecodeNormal(depthNormal);
+    normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+
+    float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+
+    const uint validPos = (dot(worldPos, worldPos) != 0);
+    const uint maxLights = _LightCount * validPos;
+
+    float4 accLight = 0, col = 0;
+    float3 ldir = 0, vdir = 0;
+    float atten = 0, intensity = 0, dist = 0;
+    DFLightData ld = (DFLightData)0;
+    
+    vdir = normalize(_CameraPos - worldPos);
+
+    [loop]
+    for (uint i = 0; i < maxLights; i++)
+    {
+        float roughness = specular.w;
+        float normalizationTerm = roughness * 4.0 + 2.0;
+        float roughness2 = roughness * roughness;
+        float roughness2MinusOne = roughness2 - 1.0;
+
+        PixelData pd;
+
+        pd.Diffuse = albedo;
+        pd.Normal = normal;
+        pd.Depth = depth;
+        pd.ViewDir = vdir;
+        pd.Position = worldPos;
+        pd.Specular = specular.rgb;
+        pd.Roughness = roughness;
+        pd.Roughness2 = roughness2;
+        pd.Roughness2MinusOne = roughness2MinusOne;
+        pd.NormalizationTerm = normalizationTerm;
+
+        _PixelData[TextureSpaceToArray(id.xy)] = pd;
+    }
+}

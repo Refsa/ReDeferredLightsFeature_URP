@@ -15,7 +15,7 @@ public class SpawnLightsTest : MonoBehaviour
             var lightgo = GameObject.Instantiate(lightPrefab, transform);
 
             Vector2 pos = Random.insideUnitCircle * spawnRange;
-            lightgo.transform.localPosition = new Vector3(pos.x, 0, pos.y);
+            lightgo.transform.localPosition = new Vector3(pos.x, Random.Range(5f, 25f), pos.y);
         }
     }
 

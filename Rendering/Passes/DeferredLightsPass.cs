@@ -86,8 +86,7 @@ class DeferredLightsPass : ScriptableRenderPass
         {
             lightDatas[lightCount].Position = ld.transform.position;
             lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
-            lightDatas[lightCount].Intensity = ld.Intensity;
-            lightDatas[lightCount].Range = ld.Range;
+            lightDatas[lightCount].Attenuation = ld.Range;
 
             lightCount++;
         }
@@ -161,15 +160,17 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.EndSample("DeferredLightsPass: Upsample Output");
         }
 
+        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CurrentActive;
+        
         // ### BLIT RESULTS BACK INTO RENDER BUFFER ###
-        if (cameraData.isDefaultViewport)
+        if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera)
         {
             cmd.SetRenderTarget(
-                BuiltinRenderTextureType.CurrentActive,
+                cameraTarget,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, // color
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
 
-            cmd.Blit(colorFullscreenHandle.id, BuiltinRenderTextureType.CurrentActive);
+            cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
         }
 
         cmd.EndSample("DeferredLightsPass: Execute");

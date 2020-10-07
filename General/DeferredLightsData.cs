@@ -12,18 +12,29 @@ public class DeferredLightsData : MonoBehaviour
     [SerializeField] bool randomData = true;
     [SerializeField] bool displayVolume;
 
-    public Color Color => color;
-    public float Intensity => Mathf.Exp(-intensity);
-    public float Range => range * range;
-    // public float Range => Mathf.Pow(range, 2);
+    public Color Color => color * intensity;
+    public Vector2 Range
+    {
+        get
+        {
+            float lightRangeSqr = range * range;
+            float fadeStartDistanceSqr = 0.8f * 0.8f * lightRangeSqr;
+            float fadeRangeSqr = (fadeStartDistanceSqr - lightRangeSqr);
+            float oneOverFadeRangeSqr = 1.0f / fadeRangeSqr;
+            float lightRangeSqrOverFadeRangeSqr = -lightRangeSqr / fadeRangeSqr;
+            float oneOverLightRangeSqr = 1.0f / Mathf.Max(0.0001f, lightRangeSqr);
+
+            return new Vector2(oneOverLightRangeSqr, lightRangeSqrOverFadeRangeSqr);
+        }
+    }
 
     void Awake()
     {
         if (randomData)
         {
             color = Random.ColorHSV();
-            range = Random.Range(5f, 20f);
-            intensity = Random.Range(0.25f, 2.5f);
+            range = Random.Range(5f, 100f);
+            intensity = Random.Range(1f, 5f);
         }
     }
 
@@ -36,18 +47,18 @@ public class DeferredLightsData : MonoBehaviour
             color.a = 1f;
             Gizmos.DrawSphere(transform.position, range);
         }
-        
+
         Gizmos.color = color;
-        Gizmos.DrawSphere(transform.position, 0.1f);
+        Gizmos.DrawSphere(transform.position, 1f);
         Gizmos.DrawWireSphere(transform.position, range);
     }
 
-    void OnEnable() 
+    void OnEnable()
     {
         DeferredLightsManager.AddLight(this);
     }
 
-    void OnDestroy() 
+    void OnDestroy()
     {
         DeferredLightsManager.RemoveLight(this);
     }

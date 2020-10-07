@@ -24,7 +24,7 @@ class AlbedoGrabPass : ScriptableRenderPass
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
 
-        renderPassEvent = RenderPassEvent.BeforeRenderingPrepasses;
+        renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
         renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);

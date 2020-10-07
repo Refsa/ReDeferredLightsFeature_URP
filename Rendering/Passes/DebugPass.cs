@@ -21,7 +21,7 @@ class DebugPass : ScriptableRenderPass
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+        renderPassEvent = RenderPassEvent.AfterRendering;
 
         backbufferHandle = colorAttachment;
     }
@@ -40,13 +40,15 @@ class DebugPass : ScriptableRenderPass
         Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;
         debugMaterial?.SetMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
 
-        if (cameraData.isDefaultViewport)
+        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CurrentActive;
+
+        if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera || cameraData.isStereoEnabled)
         {
             cmd.SetRenderTarget(
-                BuiltinRenderTextureType.CurrentActive,
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare,
+                cameraTarget,
+                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
-            cmd.Blit(BuiltinRenderTextureType.CurrentActive, BuiltinRenderTextureType.CurrentActive, debugMaterial);
+            cmd.Blit(backbufferHandle, cameraTarget, debugMaterial);
         }
 
         context.ExecuteCommandBuffer(cmd);

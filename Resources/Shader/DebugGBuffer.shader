@@ -57,13 +57,16 @@
                 float3 normal = 0; float depth = 0;
                 DecodeDepthNormal(dnenc, depth, normal);
 
+                float4 specSmooth = tex2D(_DeferredPass_Specular_Texture, i.uv);
+
                 if (_DebugMode == 0) return tex2D(_BackBuffer_Image, i.uv);
                 else if (_DebugMode == 1) return float4(normal, 1.0);
                 else if (_DebugMode == 6) return float4(mul(MATRIX_IV, float4(normal, 0)).xyz, 1.0);
                 else if (_DebugMode == 2) return float4(depth, depth, depth, 1.0);
                 else if (_DebugMode == 3) return tex2D(_DeferredPass_WorldPosition_Texture, i.uv);
                 else if (_DebugMode == 4) return tex2D(_DeferredPass_Albedo_Texture, i.uv);
-                else if (_DebugMode == 5) return tex2D(_DeferredPass_Specular_Texture, i.uv);
+                else if (_DebugMode == 5) return float4(specSmooth.rgb, 1.0);
+                else if (_DebugMode == 7) return float4(specSmooth.a, specSmooth.a, specSmooth.a, 1.0);
 
                 return float4(0,0,0,1);
             }

@@ -6,7 +6,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 {
     public const int MAX_LIGHTS = 1 << 12;
 
-    public enum DebugMode : int { None = 0, Normals = 1, Depth = 2, Positions = 3, Albedo = 4, Specular = 5, NormalWorld = 6 };
+    public enum DebugMode : int { None = 0, Normals = 1, NormalWorld = 6, Depth = 2, Positions = 3, Albedo = 4, Specular = 5, Smoothness = 7 };
 
     [System.Serializable]
     public class Settings
@@ -21,8 +21,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     {
         public Vector3 Position;
         public Vector3 Color;
-        public float Intensity;
-        public float Range;
+        public Vector2 Attenuation;
 
         public static int SizeBytes => 32;
     }

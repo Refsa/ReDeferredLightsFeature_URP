@@ -330,7 +330,7 @@
                 BRDFData brdfData;
                 InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
             
-                return float4(brdfData.specular, surfaceData.smoothness);
+                return float4(brdfData.specular, brdfData.roughness);
             }
             ENDHLSL
         }

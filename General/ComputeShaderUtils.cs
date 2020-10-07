@@ -10,11 +10,13 @@ public static class ComputeShaderUtils
     {
         public static int UpsampleOutputKernelID {get; private set;} = -1;
         public static int ComputeLightsKernelID {get; private set;} = -1;
+        public static int ComputePixelDataKernelID {get; private set;} = -1;
 
         internal static void Prepare()
         {
             UpsampleOutputKernelID = LightsCompute.FindKernel("UpsampleOutput");
             ComputeLightsKernelID = LightsCompute.FindKernel("ComputeLights");
+            ComputePixelDataKernelID = LightsCompute.FindKernel("ComputePixelData");
         }
     }
 

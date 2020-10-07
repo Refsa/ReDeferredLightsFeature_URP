@@ -24,7 +24,7 @@ class SpecularGrabPass : ScriptableRenderPass
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
 
-        renderPassEvent = RenderPassEvent.BeforeRenderingPrepasses;
+        renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
         renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
@@ -47,7 +47,7 @@ class SpecularGrabPass : ScriptableRenderPass
         cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
 
         ConfigureTarget(specularHandle.Identifier());
-        ConfigureClear(ClearFlag.Color, Color.black);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
