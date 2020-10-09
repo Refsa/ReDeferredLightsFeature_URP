@@ -76,9 +76,6 @@ class AlbedoGrabPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        if (albedoHandle != RenderTargetHandle.CameraTarget)
-        {
-            cmd.ReleaseTemporaryRT(albedoHandle.id);
-        }
+        cmd.ReleaseTemporaryRT(albedoHandle.id);
     }
 }

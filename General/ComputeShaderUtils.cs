@@ -5,6 +5,7 @@ public static class ComputeShaderUtils
 {
     public static ComputeShader LightsCompute;
     public static ComputeShader UtilsCompute;
+    public static ComputeShader TilesCompute;
 
     public static class LightsComputeKernels
     {
@@ -29,6 +30,18 @@ public static class ComputeShaderUtils
         {
             ClearTextureKernelID = UtilsCompute.FindKernel("ClearTexture");
             GaussianBlurKernelID = UtilsCompute.FindKernel("GaussianBlurTexture");
+        }
+    }
+
+    public static class TilesComputeKernels
+    {
+        public static int ComputeLightTilesKernelID {get; private set;} = -1;
+        public static int ComputeTileFrustumKernelID {get; private set;} = -1;
+
+        internal static void Prepare()
+        {
+            ComputeLightTilesKernelID = TilesCompute.FindKernel("ComputeLightTiles");
+            ComputeTileFrustumKernelID = TilesCompute.FindKernel("ComputeTileFrustums");
         }
     }
 
@@ -65,6 +78,14 @@ public static class ComputeShaderUtils
         else 
         {
             UnityEngine.Debug.LogError($"ReLights URP: Couldn't load UtilsCompute");
+            return error;
+        }
+
+        if (TilesCompute == null) error = !PrepareCompute("Compute/DeferredTiles", ref TilesCompute);
+        if (!error) TilesComputeKernels.Prepare();
+        else 
+        {
+            UnityEngine.Debug.LogError($"ReLights URP: Couldn't load TilesCompute");
             return error;
         }
 

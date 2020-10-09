@@ -73,9 +73,6 @@ class SpecularGrabPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        if (specularHandle != RenderTargetHandle.CameraTarget)
-        {
-            cmd.ReleaseTemporaryRT(specularHandle.id);
-        }
+        cmd.ReleaseTemporaryRT(specularHandle.id);
     }
 }

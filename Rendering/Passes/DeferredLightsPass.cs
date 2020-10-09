@@ -24,6 +24,8 @@ class DeferredLightsPass : ScriptableRenderPass
     LightData[] lightDatas;
     int lightCount;
 
+    public static int LightCount;
+
     public DeferredLightsPass(Settings settings)
     {
         renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
@@ -46,10 +48,30 @@ class DeferredLightsPass : ScriptableRenderPass
         lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
     }
 
-    public void SetBuffer(ref ComputeBuffer lightsBuffer, ref ComputeBuffer pixelDataBuffer)
+    public void SetBuffers(ref ComputeBuffer lightsBuffer, ref ComputeBuffer pixelDataBuffer)
     {
         this.lightDataBuffer = lightsBuffer;
         this.pixelDataBuffer = pixelDataBuffer;
+    }
+
+    public void PrepareLightDataBuffer()
+    {
+        // ### GET ALL LIGHTS IN SCENE ###
+        lightCount = 0;
+        foreach (var ld in GameObject.FindObjectsOfType<DeferredLightsData>())
+        {
+            if (!ld.gameObject.activeSelf) continue;
+
+            lightDatas[lightCount].Position = ld.transform.position;
+            lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
+            lightDatas[lightCount].Attenuation = ld.Attenuation;
+            lightDatas[lightCount].RangeSqr = ld.RangeSqr;
+
+            lightCount++;
+        }
+        LightCount = lightCount;
+        // UnityEngine.Debug.Log($"{lightCount}");
+        lightDataBuffer.SetData(lightDatas);
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -82,18 +104,6 @@ class DeferredLightsPass : ScriptableRenderPass
             rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(colorFullscreenHandle.id, rtd);
         }
-
-        // ### GET ALL LIGHTS IN SCENE ###        
-        lightCount = 0;
-        foreach (var ld in GameObject.FindObjectsOfType<DeferredLightsData>())
-        {
-            lightDatas[lightCount].Position = ld.transform.position;
-            lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
-            lightDatas[lightCount].Attenuation = ld.Range;
-
-            lightCount++;
-        }
-        // UnityEngine.Debug.Log($"{lightCount}");
 
         // ### COMPUTE GLOBALS ###
         {
@@ -143,7 +153,7 @@ class DeferredLightsPass : ScriptableRenderPass
             Camera camera = cameraData.camera;
             cmd.SetComputeVectorParam(_lightsCompute, "_CameraPos", camera.transform.position);
             cmd.SetComputeMatrixParam(_lightsCompute, "MATRIX_IV", camera.cameraToWorldMatrix);
-            cmd.SetComputeVectorParam(_lightsCompute, "_ProjectionParams", new Vector4(
+            cmd.SetComputeVectorParam(_lightsCompute, "_ProjParams", new Vector4(
                 1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
             ));
         }
@@ -191,11 +201,13 @@ class DeferredLightsPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
     }
-
+ 
     public override void FrameCleanup(CommandBuffer cmd)
     {
         cmd.ReleaseTemporaryRT(lightsHandle.id);
-
         cmd.ReleaseTemporaryRT(colorFullscreenHandle.id);
+
+        lightDataBuffer = null;
+        pixelDataBuffer = null;
     }
 }

@@ -75,10 +75,6 @@ class WorldPositionPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        if (wpHandle != RenderTargetHandle.CameraTarget)
-        {
-            cmd.ReleaseTemporaryRT(wpHandle.id);
-            // depthHandle = RenderTargetHandle.CameraTarget;
-        }
+        cmd.ReleaseTemporaryRT(wpHandle.id);
     }
 }

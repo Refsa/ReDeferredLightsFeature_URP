@@ -11,7 +11,6 @@ class DepthNormalsPass : ScriptableRenderPass
     Settings _settings;
 
     RenderTargetHandle depthHandle;
-    RenderTextureDescriptor depthDescriptor;
 
     ShaderTagId shaderTagId;
     FilteringSettings filteringSettings;
@@ -37,7 +36,7 @@ class DepthNormalsPass : ScriptableRenderPass
         int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
         int height = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
 
-        depthDescriptor = cameraTextureDescriptor;
+        var depthDescriptor = cameraTextureDescriptor;
         depthDescriptor.colorFormat = RenderTextureFormat.ARGB32;
         depthDescriptor.depthBufferBits = 32;
         depthDescriptor.msaaSamples = 1;
@@ -47,6 +46,7 @@ class DepthNormalsPass : ScriptableRenderPass
 
         ConfigureTarget(depthHandle.Identifier());
         ConfigureClear(ClearFlag.All, Color.black);
+
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -60,11 +60,12 @@ class DepthNormalsPass : ScriptableRenderPass
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-            drawSettings.perObjectData = PerObjectData.None;
+            drawSettings.perObjectData = PerObjectData.None; 
             drawSettings.overrideMaterial = _depthNormalsMaterial;
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
+            cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_DepthNormals_Texture", depthHandle.Identifier());
         }
@@ -75,10 +76,6 @@ class DepthNormalsPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        if (depthHandle != RenderTargetHandle.CameraTarget)
-        {
-            cmd.ReleaseTemporaryRT(depthHandle.id);
-            // depthHandle = RenderTargetHandle.CameraTarget;
-        }
+        cmd.ReleaseTemporaryRT(depthHandle.id);
     }
 }

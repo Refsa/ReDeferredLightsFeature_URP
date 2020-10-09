@@ -13,7 +13,8 @@ public class DeferredLightsData : MonoBehaviour
     [SerializeField] bool displayVolume;
 
     public Color Color => color * intensity;
-    public Vector2 Range
+    public float RangeSqr => range * range;
+    public Vector2 Attenuation
     {
         get
         {

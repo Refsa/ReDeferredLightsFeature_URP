@@ -11,8 +11,6 @@ class DebugPass : ScriptableRenderPass
     Settings _settings;
     Material _debugMaterial;
 
-    RenderTargetIdentifier backbufferHandle;
-
     public DebugPass(Settings settings, Material debugMaterial)
     {
         _settings = settings;
@@ -22,8 +20,6 @@ class DebugPass : ScriptableRenderPass
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         renderPassEvent = RenderPassEvent.AfterRendering;
-
-        backbufferHandle = colorAttachment;
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -48,7 +44,7 @@ class DebugPass : ScriptableRenderPass
                 cameraTarget,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
-            cmd.Blit(backbufferHandle, cameraTarget, debugMaterial);
+            cmd.Blit(cameraTarget, cameraTarget, debugMaterial);
         }
 
         context.ExecuteCommandBuffer(cmd);

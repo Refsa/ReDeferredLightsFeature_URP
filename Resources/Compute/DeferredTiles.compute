@@ -1,0 +1,170 @@
+#pragma kernel ComputeLightTiles
+#pragma kernel ComputeTileFrustums
+
+#include "Common.hlsl"
+
+cbuffer ThreadData
+{
+    float2 _NumThreads;
+    float2 _NumThreadGroups;
+};
+
+RWStructuredBuffer<Frustum> _Frustum;
+
+RWStructuredBuffer<uint> _LightIndexData;
+RWStructuredBuffer<uint> _LightIndexCounter;
+RWTexture2D<uint2> _TileData;
+
+Texture2D<float4> _DepthNormalsTexture;
+
+// #########################
+// ### COMPUTE TILE DATA ###
+// #########################
+
+groupshared uint uMinDepth;
+groupshared uint uMaxDepth;
+groupshared Frustum GroupFrustum;
+groupshared uint LightCount;
+groupshared uint LightIndexStartOffset;
+groupshared uint LightList[1024];
+
+inline void AppendLight(uint lightIndex)
+{
+    uint index;
+    InterlockedAdd(LightCount, 1, index);
+    if (index < 1024)
+    {
+        LightList[index] = lightIndex;
+    }
+}
+
+[numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
+void ComputeLightTiles(
+    uint3 id : SV_DISPATCHTHREADID, 
+    uint groupIndex : SV_GROUPINDEX, 
+    uint3 groupID: SV_GROUPID, 
+    uint3 groupThreadID : SV_GROUPTHREADID)
+{
+    uint i = 0;
+
+    int2 texCoord = id.xy;
+    float4 dnenc = _DepthNormalsTexture.Load(int3(texCoord, 0));
+    float depth = DecodeFloatRG(dnenc.zw);
+    uint uDepth = asuint(depth);
+
+    if (groupIndex == 0)
+    {
+        uMinDepth = 0xffffffff;
+        uMaxDepth = 0;
+        LightCount = 0;
+        GroupFrustum = _Frustum[groupID.x + (groupID.y * _NumThreadGroups.x)];
+
+        // for (int i = 0; i < groupID.x * groupID.y; i++) AppendLight(0);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    InterlockedMin(uMinDepth, uDepth);
+    InterlockedMax(uMaxDepth, uDepth);
+
+    GroupMemoryBarrierWithGroupSync();
+
+    float fMinDepth = asfloat(uMinDepth);
+    float fMaxDepth = asfloat(uMaxDepth);
+
+    float minDepthVS = ClipToView(float4(0, 0, fMinDepth, 1)).z;
+    float maxDepthVS = ClipToView(float4(0, 0, fMaxDepth, 1)).z;
+    float nearClipVS = ClipToView(float4(0, 0, 0,         1)).z;
+
+    Plane minPlane    = (Plane)0;
+    minPlane.Normal   = float3(0,0,-1);
+    minPlane.Distance = -minDepthVS;
+
+    for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
+    {
+        DFLightData ld = _LightData[i];
+        Sphere sphere = (Sphere)0;
+
+        sphere.Center = WorldToViewPos(ld.Position);
+
+        sphere.Radius = sqrt(ld.RangeSqr);
+        bool insideFrustum = SphereInsideFrustum(sphere, GroupFrustum, nearClipVS, maxDepthVS);
+        if (insideFrustum)
+        {
+            bool insidePlane = SphereInsidePlane(sphere, minPlane);
+            if (!insidePlane)
+            {
+                AppendLight(i);
+            }
+        }
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    if (groupIndex == 0)
+    {
+        InterlockedAdd(_LightIndexCounter[0], LightCount, LightIndexStartOffset);
+        _TileData[groupID.xy] = uint2(LightIndexStartOffset, LightCount);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    for (i = groupIndex; i < LightCount; i+= BLOCK_SIZE * BLOCK_SIZE)
+    {
+        _LightIndexData[LightIndexStartOffset + i] = LightList[i];
+    }
+} 
+
+
+
+
+
+// ###########################
+// ### FRUSTUM CALCULATION ###
+// ###########################
+
+inline Plane ComputePlane( float3 p0, float3 p1, float3 p2 )
+{
+    Plane plane;
+ 
+    float3 v0 = p1 - p0;
+    float3 v2 = p2 - p0;
+ 
+    plane.Normal = normalize( cross( v0, v2 ) );
+ 
+    // Compute the distance to the origin using p0.
+    plane.Distance = dot( plane.Normal, p0 );
+ 
+    return plane;
+}
+
+[numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
+void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
+{
+    const float3 eyePos = float3(0,0,0);
+
+    float4 screenSpace[4];
+    screenSpace[0] = float4(id.xy * BLOCK_SIZE, -1.0, 1.0);
+    screenSpace[1] = float4(float2(id.x + 1.0, id.y) * BLOCK_SIZE, -1.0, 1.0);
+    screenSpace[2] = float4(float2(id.x, id.y + 1.0) * BLOCK_SIZE, -1.0, 1.0);
+    screenSpace[3] = float4(float2(id.x + 1.0, id.y + 1.0) * BLOCK_SIZE, -1.0, 1.0);
+
+    float3 viewSpace[4];
+    [unroll]
+    for (int i = 0; i < 4; i++)
+    {
+        viewSpace[i] = ScreenToView(screenSpace[i]).xyz;
+    }
+
+    Frustum frustum;
+    frustum.planes[0] = ComputePlane(eyePos, viewSpace[2], viewSpace[0]);
+    frustum.planes[1] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]);
+    frustum.planes[2] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]);
+    frustum.planes[3] = ComputePlane(eyePos, viewSpace[3], viewSpace[2]);
+
+    if ( id.x < uint(_NumThreads.x) && id.y < uint(_NumThreads.y) )
+    {
+        uint index = id.x + (id.y * _NumThreads.x);
+        _Frustum[index] = frustum;
+    }
+}

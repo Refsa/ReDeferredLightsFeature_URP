@@ -5,8 +5,7 @@
 
 // #include "UnityCG.cginc"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl" 
-
-float _RenderScale;
+#include "Common.hlsl"
 
 // GBuffers
 Texture2D<float4> _AlbedoTexture;
@@ -15,11 +14,9 @@ Texture2D<float4> _DepthNormalsTexture;
 Texture2D<float4> _WorldPositionsTexture;
 
 // Lights Texture
-float2 _InputSize;
 RWTexture2D<float4> _DeferredLightsTexture;
 
 // Output Texture
-float2 _OutputSize;
 RWTexture2D<float4> _DeferredOutputTexture;
 
 [numthreads(32,32,1)]
@@ -52,71 +49,9 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
 // ###########################
 // #### LIGHTS START HERE ####
 // ###########################
-struct PixelData
-{
-    float3 Diffuse;
-    float3 Normal;
-    float Depth;
-    float3 ViewDir;
-    float3 Position;
-    float3 Specular;
-    float Roughness;
-    float Roughness2;
-    float Roughness2MinusOne;
-    float NormalizationTerm;
-};
 
-RWStructuredBuffer<PixelData> _PixelData; 
-
-struct DFLightData
-{
-    float3 Position;
-    float3 Color;
-    float2 Attenuation;
-};
-
-StructuredBuffer<DFLightData> _LightData;
-uint _LightCount;
-float4x4 _MVP;
-float4x4 MATRIX_IV;
-float3 _CameraPos;
-
-inline float3 WorldToViewPos(float3 pos)
-{
-    return mul(transpose(MATRIX_IV), float4(pos, 1.0)).xyz;
-}
-
-inline float WorldTo01Depth(float3 pos)
-{
-    return -(WorldToViewPos(pos).z * _ProjectionParams.w);
-}
-
-inline float WorldToEyeDepth(float3 pos)
-{
-    return -(WorldToViewPos(pos).z);
-}
-
-inline float remap(float s) 
-{
-    return (s + 1.0) / 2.0;
-}
-
-inline float3 DecodeNormal(float4 enc)
-{
-    float kScale = 1.7777;
-    float3 nn = enc.xyz*float3(2*kScale,2*kScale,0) + float3(-kScale,-kScale,1);
-    float g = 2.0 / dot(nn.xyz,nn.xyz);
-    float3 n;
-    n.xy = g*nn.xy;
-    n.z = g-1;
-    return n;
-}
-
-inline float DecodeFloatRG( float2 enc )
-{
-    float2 kDecodeDot = float2(1.0, 1/255.0);
-    return dot( enc, kDecodeDot );
-}
+RWStructuredBuffer<uint> _LightIndexData;
+RWTexture2D<uint2> _TileData;
 
 inline float3 DirectBRDF_float(PixelData pd, float3 lightDir)
 {
@@ -149,20 +84,18 @@ inline float DistanceAttenuation(float distSqr, float2 distAtten)
 
     return lightAtten * smoothFactor;
 }
-
-inline uint TextureSpaceToArray(uint2 id)
-{
-    return id.x + _InputSize.x * id.y;
-}
  
 [numthreads(32,32,1)]
 void ComputeLights (uint3 id : SV_DispatchThreadID)
-{
-    PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
+{    
+    uint2 tileIndex = id.xy / BLOCK_SIZE;
+    uint lightStart = _TileData[tileIndex].x;
+    uint lightCount = _TileData[tileIndex].y;
 
+    PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
     float3 worldPos = pd.Position;
 
-    uint validPos = (length(worldPos) != 0);
+    const uint validPos = (length(worldPos) != 0);
 
     float4 accLight = 0, col = 0;
     float3 ldir = 0;
@@ -173,6 +106,10 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
     for (uint i = 0; i < _LightCount * validPos; i++)
     {
         ld = _LightData[i];
+    // for (uint i = 0; i < lightCount; i++)
+    // {
+        // uint lightIndex = _LightIndexData[lightStart + i];
+        // ld = _LightData[lightIndex];
          
         ldir = (ld.Position - worldPos);
         dist = dot(ldir, ldir);
@@ -181,12 +118,15 @@ void ComputeLights (uint3 id : SV_DispatchThreadID)
         // float ldepth = WorldToEyeDepth(ld.Position);
         // if (ldepth > depth) continue;
 
-        atten = DistanceAttenuation(dist, ld.Attenuation);
+        // [branch] if (dist < ld.RangeSqr)
+        {
+            atten = DistanceAttenuation(dist, ld.Attenuation);
 
-        col.rgb = LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
-        col.a = 0.1;
+            col.rgb = LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
+            col.a = 0.1;
 
-        accLight += col;
+            accLight += col;
+        }
     }
 
     _DeferredLightsTexture[id.xy] = accLight;

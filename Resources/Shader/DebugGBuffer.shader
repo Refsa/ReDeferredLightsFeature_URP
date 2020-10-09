@@ -43,6 +43,9 @@
             sampler2D _DeferredPass_Specular_Texture;
             float4 _DeferredPass_Specular_Texture_ST;
 
+            Texture2D<uint2> _TileData;
+            sampler2D sampler_TileData;
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -67,6 +70,14 @@
                 else if (_DebugMode == 4) return tex2D(_DeferredPass_Albedo_Texture, i.uv);
                 else if (_DebugMode == 5) return float4(specSmooth.rgb, 1.0);
                 else if (_DebugMode == 7) return float4(specSmooth.a, specSmooth.a, specSmooth.a, 1.0);
+                else if (_DebugMode == 8) 
+                {
+                    // uint2 tileData = _TileData[i.uv * float2(120, 68) * 1.5];
+                    uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
+
+                    float strength = tileData.y;
+                    return float4(strength, strength, strength, 1.0);
+                }
 
                 return float4(0,0,0,1);
             }
