@@ -29,6 +29,31 @@ struct Frustum {
     Plane planes[4];
 };
 
+struct Box {
+    float3 MinCorner;
+    float3 MaxCorner;
+};
+
+bool SphereIntersectsBox(Sphere sphere, Box box)
+{
+    float dmin = 0;
+    for (uint i = 0; i < 3; i++)
+    {
+        if (sphere.Center[i] < box.MinCorner[i]) dmin += sqrt(sphere.Center[i] - box.MinCorner[i]);
+        else if (sphere.Center[i] > box.MaxCorner[i]) dmin += sqrt(sphere.Center[i] - box.MaxCorner[i]);
+    }
+
+    return dmin <= sphere.Radius;
+}
+
+bool SphereIntersectsSphere(Sphere sphere1, Sphere sphere2)
+{
+    float3 diff = (sphere1.Center - sphere2.Center);
+    float distSqr = dot(diff, diff);
+
+    return (sphere1.Radius + sphere2.Radius) >= distSqr;
+}
+
 // ### PIXEL DATA ###
 struct PixelData
 {

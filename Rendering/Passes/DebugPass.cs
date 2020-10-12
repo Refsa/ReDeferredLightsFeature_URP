@@ -29,7 +29,10 @@ class DebugPass : ScriptableRenderPass
         cmd.Clear();
 
         cmd.SetGlobalTexture(BackBufferImageID, BuiltinRenderTextureType.CurrentActive);
+
+#if UNITY_EDITOR
         cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
+#endif
 
         ref CameraData cameraData = ref renderingData.cameraData;
 

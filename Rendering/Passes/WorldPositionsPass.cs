@@ -66,6 +66,7 @@ class WorldPositionPass : ScriptableRenderPass
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+            cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_WorldPosition_Texture", wpHandle.Identifier());
         }
 

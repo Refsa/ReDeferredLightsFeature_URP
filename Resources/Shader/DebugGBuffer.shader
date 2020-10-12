@@ -71,12 +71,18 @@
                 else if (_DebugMode == 5) return float4(specSmooth.rgb, 1.0);
                 else if (_DebugMode == 7) return float4(specSmooth.a, specSmooth.a, specSmooth.a, 1.0);
                 else if (_DebugMode == 8) 
-                {
-                    // uint2 tileData = _TileData[i.uv * float2(120, 68) * 1.5];
-                    uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
+                {   
+                    static const float3 lowColor = float3(0,1,0);
+                    static const float3 mediumColor = float3(1,1,0);
+                    static const float3 highColor = float3(1,0,0);
 
-                    float strength = tileData.y;
-                    return float4(strength, strength, strength, 1.0);
+                    uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
+                    float strength = tileData.y / 255.0;
+
+                    // float3 color = lerp(lerp(lowColor, mediumColor, strength), highColor, strength);
+                    float3 color = strength;
+
+                    return float4(color * 0.25, 1.0);
                 }
 
                 return float4(0,0,0,1);

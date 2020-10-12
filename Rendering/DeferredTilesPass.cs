@@ -10,9 +10,9 @@ public class DeferredTilesPass : ScriptableRenderPass
 {
     public class DeferredTilesBuffers : System.IDisposable
     {
-        public ComputeBuffer LightIndexBuffer {get; private set;}
-        public ComputeBuffer LightIndexCounterBuffer {get; private set;}
-        public ComputeBuffer FrustumDataBuffer {get; private set;}
+        public ComputeBuffer LightIndexBuffer { get; private set; }
+        public ComputeBuffer LightIndexCounterBuffer { get; private set; }
+        public ComputeBuffer FrustumDataBuffer { get; private set; }
 
         public void Dispose()
         {
@@ -49,7 +49,9 @@ public class DeferredTilesPass : ScriptableRenderPass
     const int TILE_SIZE = 16;
     const float TILE_SIZE_FLOAT = (float)TILE_SIZE;
     const int MAX_TILES = ((2560 * 1440) / (TILE_SIZE * TILE_SIZE));
-    const int MAX_LIGHTS_PER_TILE = MAX_TILES * 256;
+    const int MAX_LIGHTS_PER_TILE = MAX_TILES * TILE_SIZE * 256;
+
+    uint[] tileIndexCounterClear = new uint[1] { 0u };
 
     ComputeShader tilesCompute;
     ComputeShader lightsCompute;
@@ -81,14 +83,14 @@ public class DeferredTilesPass : ScriptableRenderPass
         this.lightDataBuffer = lightDataBuffer;
         this.computeBuffers = buffers;
     }
- 
+
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        int textureWidth = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
-        int textureHeight = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
+        int textureWidth = cameraTextureDescriptor.width;
+        int textureHeight = cameraTextureDescriptor.height;
 
-        width = Mathf.CeilToInt(((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier) / TILE_SIZE_FLOAT); // g
-        height = Mathf.CeilToInt(((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier) / TILE_SIZE_FLOAT); // g
+        width = Mathf.CeilToInt((float)textureWidth / TILE_SIZE_FLOAT); // g
+        height = Mathf.CeilToInt((float)textureHeight / TILE_SIZE_FLOAT); // g
 
         int newTileDispatchX = Mathf.CeilToInt(width / TILE_SIZE_FLOAT);  // G
         int newTileDispatchY = Mathf.CeilToInt(height / TILE_SIZE_FLOAT); // G
@@ -137,6 +139,7 @@ public class DeferredTilesPass : ScriptableRenderPass
             Camera camera = cameraData.camera;
 
             cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(camera.pixelWidth, camera.pixelHeight));
+            cmd.SetComputeVectorParam(tilesCompute, "_CameraPos", camera.transform.position);
             cmd.SetComputeVectorParam(tilesCompute, "_ProjParams", new Vector4(
                     1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
                 ));
@@ -148,12 +151,17 @@ public class DeferredTilesPass : ScriptableRenderPass
             cmd.SetComputeVectorParam(tilesCompute, "_NumThreadGroups", new Vector2(tileDispatchX, tileDispatchY));
         }
 
+        // ### RESET DATA ###
+        {
+            computeBuffers.LightIndexCounterBuffer.SetData(tileIndexCounterClear);
+        }
+
         // ### COMPUTE FRUSTUMS ###
         // if (refreshTiles)
         {
-            cmd.BeginSample("DeferredLightsPass: Compute Tile Frustums");
-            cmd.DispatchCompute(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, width, height, 1);
-            cmd.EndSample("DeferredLightsPass: Compute Tile Frustums");
+            // cmd.BeginSample("DeferredLightsPass: Compute Tile Frustums");
+            // cmd.DispatchCompute(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, width, height, 1);
+            // cmd.EndSample("DeferredLightsPass: Compute Tile Frustums");
         }
 
         // ### COMPUTE PER TILE LIGHT DATA ###
@@ -167,26 +175,29 @@ public class DeferredTilesPass : ScriptableRenderPass
         CommandBufferPool.Release(cmd);
     }
 
-    struct Plane {
+    struct Plane
+    {
         public Vector3 Normal;
         public float Distance;
     }
 
-    struct Frustum {
+    struct Frustum
+    {
         public Plane Plane1;
         public Plane Plane2;
         public Plane Plane3;
         public Plane Plane4;
     }
 
-    struct FrustumEx {
+    struct FrustumEx
+    {
         public Plane[] planes;
     }
 
     Frustum[] frustumData = new Frustum[MAX_TILES];
 
     public override void FrameCleanup(CommandBuffer cmd)
-    {   
+    {
         // int tiles = width * height;
         // computeBuffers.FrustumDataBuffer.GetData(frustumData, 0, 0, tiles);
 

@@ -16,18 +16,25 @@ RWStructuredBuffer<uint> _LightIndexCounter;
 RWTexture2D<uint2> _TileData;
 
 Texture2D<float4> _DepthNormalsTexture;
+Texture2D<float4> _WorldPositionsTexture;
 
 // #########################
 // ### COMPUTE TILE DATA ###
 // #########################
 
-groupshared uint uMinDepth;
-groupshared uint uMaxDepth;
-groupshared Frustum GroupFrustum;
 groupshared uint LightCount;
 groupshared uint LightIndexStartOffset;
 groupshared uint LightList[1024];
+groupshared float3 PosDir;
+groupshared float Dist;
+groupshared float Dist2;
+groupshared float DistS;
+groupshared uint MaxDist;
+groupshared uint MinDist;
+// groupshared Box TileBox;
+// groupshared Sphere TileSphere;
 
+static const float MaxCheck = 300 * 300;
 inline void AppendLight(uint lightIndex)
 {
     uint index;
@@ -48,54 +55,49 @@ void ComputeLightTiles(
     uint i = 0;
 
     int2 texCoord = id.xy;
-    float4 dnenc = _DepthNormalsTexture.Load(int3(texCoord, 0));
-    float depth = DecodeFloatRG(dnenc.zw);
-    uint uDepth = asuint(depth);
+    float3 wpos = _WorldPositionsTexture.Load(int3(texCoord, 0));
+    float dist = distance(_CameraPos, wpos);
+    uint idist = asuint(dist);
 
     if (groupIndex == 0)
     {
-        uMinDepth = 0xffffffff;
-        uMaxDepth = 0;
+        LightIndexStartOffset = 0;
         LightCount = 0;
-        GroupFrustum = _Frustum[groupID.x + (groupID.y * _NumThreadGroups.x)];
+        PosDir = normalize(wpos - _CameraPos);
+        Dist = dist;
+        Dist2 = dist * dist;
+        DistS = Dist2 * 0.025;
 
-        // for (int i = 0; i < groupID.x * groupID.y; i++) AppendLight(0);
+        MaxDist = 0;
+        MinDist = 0xffffffff;
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    InterlockedMin(uMinDepth, uDepth);
-    InterlockedMax(uMaxDepth, uDepth);
+    InterlockedMax(MaxDist, idist);
+    InterlockedMin(MinDist, idist);
 
     GroupMemoryBarrierWithGroupSync();
 
-    float fMinDepth = asfloat(uMinDepth);
-    float fMaxDepth = asfloat(uMaxDepth);
-
-    float minDepthVS = ClipToView(float4(0, 0, fMinDepth, 1)).z;
-    float maxDepthVS = ClipToView(float4(0, 0, fMaxDepth, 1)).z;
-    float nearClipVS = ClipToView(float4(0, 0, 0,         1)).z;
-
-    Plane minPlane    = (Plane)0;
-    minPlane.Normal   = float3(0,0,-1);
-    minPlane.Distance = -minDepthVS;
+    float maxDist = asfloat(MaxDist);
+    float minDist = asfloat(MinDist);
 
     for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
         DFLightData ld = _LightData[i];
-        Sphere sphere = (Sphere)0;
 
-        sphere.Center = WorldToViewPos(ld.Position);
+        float3 sDir = (ld.Position - _CameraPos);
+        // float sDepth = dot(sDir, sDir);
+        float sDepth = length(sDir);
+        sDir = normalize(sDir);
+        float sDepth2 = sDepth * sDepth;
+        float twobc = 2 * sDepth * Dist;
+        float c = sDepth2 + Dist2 - twobc * dot(PosDir, sDir);
 
-        sphere.Radius = sqrt(ld.RangeSqr);
-        bool insideFrustum = SphereInsideFrustum(sphere, GroupFrustum, nearClipVS, maxDepthVS);
-        if (insideFrustum)
+        // if (c < min(max(DistS, ld.RangeSqr), MaxCheck))
+        if (c < max(DistS, ld.RangeSqr))
         {
-            bool insidePlane = SphereInsidePlane(sphere, minPlane);
-            if (!insidePlane)
-            {
-                AppendLight(i);
-            }
+            AppendLight(i);
         }
     }
 
@@ -104,7 +106,7 @@ void ComputeLightTiles(
     if (groupIndex == 0)
     {
         InterlockedAdd(_LightIndexCounter[0], LightCount, LightIndexStartOffset);
-        _TileData[groupID.xy] = uint2(LightIndexStartOffset, LightCount);
+        _TileData[groupID.xy] = uint2(LightIndexStartOffset, LightCount * (length(wpos) > 0));
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -116,7 +118,12 @@ void ComputeLightTiles(
 } 
 
 
+RWStructuredBuffer<Box> _TileBoxes;
+[numthreads(BLOCK_SIZE, BLOCK_SIZE, 1)]
+void ComputeTileBoxes(uint3 id : SV_DISPATCHTHREADID)
+{
 
+}
 
 
 // ###########################

@@ -173,7 +173,7 @@ class DeferredLightsPass : ScriptableRenderPass
         // ### BLUR LIGHTS TEXTURE ###
         {
             cmd.BeginSample("DeferredLightsPass: Blur Lights");
-            ComputeShaderUtils.Utils.DispatchGaussianBlur(cmd, lightsHandle.Identifier(), (int)passSize.x / 32, (int)passSize.y / 18);
+            // ComputeShaderUtils.Utils.DispatchGaussianBlur(cmd, lightsHandle.Identifier(), (int)passSize.x / 32, (int)passSize.y / 18);
             cmd.EndSample("DeferredLightsPass: Blur Lights");
         }
         // ### UPSAMPLE LIGHTS TEXTURE ###

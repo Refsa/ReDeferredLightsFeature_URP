@@ -86,47 +86,46 @@ inline float DistanceAttenuation(float distSqr, float2 distAtten)
 }
  
 [numthreads(32,32,1)]
-void ComputeLights (uint3 id : SV_DispatchThreadID)
+void ComputeLights (
+    uint3 id : SV_DispatchThreadID, 
+    uint3 groupID: SV_GROUPID, 
+    uint3 groupThreadID : SV_GROUPTHREADID)
 {    
     uint2 tileIndex = id.xy / BLOCK_SIZE;
     uint lightStart = _TileData[tileIndex].x;
     uint lightCount = _TileData[tileIndex].y;
 
+    [branch] if (lightCount == 0) 
+    {
+        _DeferredLightsTexture[id.xy] = 0;
+        return;
+    }
+
     PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
     float3 worldPos = pd.Position;
-
-    const uint validPos = (length(worldPos) != 0);
 
     float4 accLight = 0, col = 0;
     float3 ldir = 0;
     float atten = 0, intensity = 0, dist = 0;
     DFLightData ld = (DFLightData)0;
+
+    col.a = 1.0;
      
-    [loop]
-    for (uint i = 0; i < _LightCount * validPos; i++)
+    [loop] for (uint i = 0; i < lightCount; i++)
     {
-        ld = _LightData[i];
-    // for (uint i = 0; i < lightCount; i++)
-    // {
-        // uint lightIndex = _LightIndexData[lightStart + i];
-        // ld = _LightData[lightIndex];
+        uint lightIndex = _LightIndexData[lightStart + i];
+        ld = _LightData[lightIndex];
          
         ldir = (ld.Position - worldPos);
         dist = dot(ldir, ldir);
         ldir = normalize(ldir);
 
-        // float ldepth = WorldToEyeDepth(ld.Position);
-        // if (ldepth > depth) continue;
+        atten = DistanceAttenuation(dist, ld.Attenuation);
 
-        // [branch] if (dist < ld.RangeSqr)
-        {
-            atten = DistanceAttenuation(dist, ld.Attenuation);
+        col.rgb = LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
+        col.a = atten * ld.RangeSqr * 0.1;
 
-            col.rgb = LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
-            col.a = 0.1;
-
-            accLight += col;
-        }
+        accLight += col;
     }
 
     _DeferredLightsTexture[id.xy] = accLight;

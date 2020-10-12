@@ -1,4 +1,4 @@
-﻿Shader "Universal Render Pipeline/Deferred Lit"
+﻿Shader "Refsa/Deferred Lit"
 {
     Properties
     {
