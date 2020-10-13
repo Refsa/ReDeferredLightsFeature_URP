@@ -95,14 +95,42 @@ void ComputeLights (
     uint lightStart = _TileData[tileIndex].x;
     uint lightCount = _TileData[tileIndex].y;
 
-    [branch] if (lightCount == 0) 
+    // PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
+    // float3 worldPos = pd.Position;
+
+    float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
+
+    [branch] if (lightCount == 0 || !all(worldPos))
     {
         _DeferredLightsTexture[id.xy] = 0;
         return;
     }
 
-    PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
-    float3 worldPos = pd.Position;
+    float4 depthNormal = _DepthNormalsTexture[id.xy];
+    float4 specular = _SpecularTexture[id.xy];
+    float3 albedo = _AlbedoTexture[id.xy].rgb;
+
+    float depth = DecodeFloatRG(depthNormal.zw);
+    float3 normal = DecodeNormal(depthNormal);
+    normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+
+    float roughness = specular.w;
+    float normalizationTerm = roughness * 4.0 + 2.0;
+    float roughness2 = roughness * roughness;
+    float roughness2MinusOne = roughness2 - 1.0;
+    float3 vdir = normalize(_CameraPos - worldPos);
+
+    PixelData pd = (PixelData)0;
+    pd.Diffuse = albedo;
+    pd.Normal = normal;
+    pd.Depth = depth;
+    pd.ViewDir = vdir;
+    pd.Position = worldPos;
+    pd.Specular = specular.rgb;
+    pd.Roughness = roughness;
+    pd.Roughness2 = roughness2;
+    pd.Roughness2MinusOne = roughness2MinusOne;
+    pd.NormalizationTerm = normalizationTerm;
 
     float4 accLight = 0, col = 0;
     float3 ldir = 0;

@@ -29,6 +29,13 @@ public class DeferredLightsData : MonoBehaviour
         }
     }
 
+    public void SetData(Color color, float intensity, float range)
+    {
+        this.color = color;
+        this.intensity = intensity;
+        this.range = range;
+    }
+
     void Awake()
     {
         if (randomData)

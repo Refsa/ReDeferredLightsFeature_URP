@@ -5,22 +5,35 @@ using UnityEngine;
 public class SpawnLightsTest : MonoBehaviour
 {
     [SerializeField] GameObject lightPrefab;
-    [SerializeField] int spawnCount = 256;
-    [SerializeField] float spawnRange = 256f;
+    [SerializeField] int lightCount = 128;
+    [SerializeField] float lightRange = 100f;
 
-    void Start()
+    void Start() 
     {
-        for (int i = 0; i < spawnCount; i++)
-        {
-            var lightgo = GameObject.Instantiate(lightPrefab, transform);
+        DeleteLights();
+        SpawnLights();    
+    }
 
-            Vector2 pos = Random.insideUnitCircle * spawnRange;
-            lightgo.transform.localPosition = new Vector3(pos.x, Random.Range(5f, 25f), pos.y);
+    public void SpawnLights()
+    {
+        for (int i = 0; i < lightCount; i++)
+        {
+            var go = GameObject.Instantiate(lightPrefab, transform);
+
+            Vector2 pos = Random.insideUnitCircle * lightRange;
+
+            go.transform.position = new Vector3(pos.x, Random.Range(3f, 30f), pos.y);
+
+            var light = go.GetComponent<DeferredLightsData>();
+            light.SetData(Random.ColorHSV(), Random.Range(1f, 5f), Random.Range(5f, 200f));
         }
     }
 
-    void Update()
+    public void DeleteLights()
     {
-        
+        while (transform.childCount > 0)
+        {
+            GameObject.DestroyImmediate(transform.GetChild(0).gameObject);
+        }
     }
 }

@@ -159,10 +159,9 @@ class DeferredLightsPass : ScriptableRenderPass
         }
         // ### PRE-COMPUTE PIXEL DATA ###
         {
-            cmd.BeginSample("DeferredLightsPass: Pre Compute Pixel Data");
-            cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
-            cmd.CreateGraphicsFence(GraphicsFenceType.AsyncQueueSynchronisation, SynchronisationStageFlags.ComputeProcessing);
-            cmd.EndSample("DeferredLightsPass: Pre Compute Pixel Data");
+            // cmd.BeginSample("DeferredLightsPass: Pre Compute Pixel Data");
+            // cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
+            // cmd.EndSample("DeferredLightsPass: Pre Compute Pixel Data");
         }
         // ### DISPATCH LIGHT COMPUTE ###
         {
@@ -172,9 +171,9 @@ class DeferredLightsPass : ScriptableRenderPass
         } 
         // ### BLUR LIGHTS TEXTURE ###
         {
-            cmd.BeginSample("DeferredLightsPass: Blur Lights");
+            // cmd.BeginSample("DeferredLightsPass: Blur Lights");
             // ComputeShaderUtils.Utils.DispatchGaussianBlur(cmd, lightsHandle.Identifier(), (int)passSize.x / 32, (int)passSize.y / 18);
-            cmd.EndSample("DeferredLightsPass: Blur Lights");
+            // cmd.EndSample("DeferredLightsPass: Blur Lights");
         }
         // ### UPSAMPLE LIGHTS TEXTURE ###
         {

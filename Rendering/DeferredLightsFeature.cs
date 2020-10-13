@@ -6,7 +6,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 {
     public const int MAX_LIGHTS = 1 << 16;
 
-    public enum DebugMode : int { None = 0, Normals = 1, NormalWorld = 6, Depth = 2, Positions = 3, Albedo = 4, Specular = 5, Smoothness = 7, TileData = 8 };
+    public enum DebugMode : int { None = 0, Normals = 1, NormalWorld = 6, Depth = 2, Positions = 3, Albedo = 4, Specular = 5, Smoothness = 7, TileData = 8, TileDataOverlay = 9 };
 
     [System.Serializable]
     public class Settings
@@ -88,7 +88,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         debugPass = new DebugPass(settings, debugMaterial);
     }
- 
+
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
         if (error)
@@ -103,7 +103,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         }
         if (pixelDataBuffer == null)
         {
-            pixelDataBuffer = new ComputeBuffer(2560*1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
+            pixelDataBuffer = new ComputeBuffer(2560 * 1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
             pixelDataBuffer.name = "PixelDataBuffer";
         }
         if (deferredTilesBuffers == null) deferredTilesBuffers = new DeferredTilesPass.DeferredTilesBuffers();
@@ -122,7 +122,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         renderer.EnqueuePass(debugPass);
     }
- 
+
     void OnDisable()
     {
         lightsDataBuffer?.Release();
