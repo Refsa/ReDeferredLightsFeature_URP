@@ -17,6 +17,7 @@ RWTexture2D<uint2> _TileData;
 
 Texture2D<float4> _DepthNormalsTexture;
 Texture2D<float4> _WorldPositionsTexture;
+Texture2D _DepthTexture;
 
 // #########################
 // ### COMPUTE TILE DATA ###
@@ -25,9 +26,9 @@ Texture2D<float4> _WorldPositionsTexture;
 groupshared uint LightCount;
 groupshared uint LightIndexStartOffset;
 groupshared uint LightList[1024];
-groupshared uint MinDist;
-groupshared uint MaxDist;
-groupshared float3 PosDir;
+groupshared uint MinDepth;
+groupshared uint MaxDepth;
+groupshared Frustum GroupFrustum;
 
 inline void AppendLight(uint lightIndex)
 {
@@ -47,64 +48,48 @@ void ComputeLightTiles(
     uint3 groupThreadID : SV_GROUPTHREADID)
 {
     uint i = 0;
-
-    int2 texCoord = id.xy;// + int2(BLOCK_SIZE, BLOCK_SIZE) * 0.25;
-    float3 wpos = _WorldPositionsTexture.Load(int3(texCoord, 0));
-    float dist = distance(_CameraPos, wpos);
-    uint idist = asuint(dist);
+    int2 texCoord = id.xy;
+    float depth = _DepthTexture.Load(uint3(texCoord, 0)).r;
+    // float2 dnenc = _DepthNormalsTexture.Load(uint3(texCoord, 0)).zw;
+    // float depth = DecodeFloatRG(dnenc);
+    
+    int idepth = asuint(1 - depth);
 
     if (groupIndex == 0)
     {
         LightIndexStartOffset = 0;
         LightCount = 0;
 
-        MinDist = 0xffffffff;
-        MaxDist = 0;
+        MinDepth = 0xffffffff;
+        MaxDepth = 0;
 
-        PosDir = normalize(wpos - _CameraPos);
+        GroupFrustum = _Frustum[groupID.x + (groupID.y * _NumThreads.x)];
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    InterlockedMax(MaxDist, idist);
-    InterlockedMin(MinDist, idist);
+    InterlockedMin(MinDepth, idepth);
+    InterlockedMax(MaxDepth, idepth);
 
     GroupMemoryBarrierWithGroupSync();
 
-    float minDist = asfloat(MinDist);
-    float maxDist = asfloat(MaxDist);
-    float distDiff = maxDist - minDist;
+    float minDepth = asfloat(MinDepth);
+    float maxDepth = asfloat(MaxDepth);
+
+    float minDepthVS = NDCToView(float4(0, 0, 1 - minDepth, 1)).z;
+    float maxDepthVS = NDCToView(float4(0, 0, 1 - maxDepth, 1)).z;
 
     for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
         DFLightData ld = _LightData[i];
 
-        float3 sDir = (ld.Position - _CameraPos);
-        float sDepth = length(sDir);
-        sDir = normalize(sDir);
-        float sDepth2 = sDepth * sDepth;
+        float3 lightViewPos = WorldToViewPos(ld.Position);
+        Sphere sphere = {lightViewPos, sqrt(ld.RangeSqr)};
 
-        float twobc = 2 * sDepth * maxDist;
-        float c = sDepth2 + (maxDist * maxDist) - twobc * dot(PosDir, sDir);
-
-        if (c > ld.RangeSqr)
-        {
-            twobc = 2 * sDepth * minDist;
-            c = sDepth2 + (minDist * minDist) - twobc * dot(PosDir, sDir);
-        }
- 
-        // if (c <= max(ld.RangeSqr, dist * 11000 * (1 - rcp(_InputSize.x / BLOCK_SIZE)) * rcp(ld.RangeSqr)))
-        if (c <= ld.RangeSqr)
+        if (SphereInsideFrustum(sphere, GroupFrustum, minDepthVS, maxDepthVS))
         {
             AppendLight(i);
         }
-
-        // float3 dir = (ld.Position - wpos);
-        // float ldist = dot(dir, dir);
-        // if (ldist <= ld.RangeSqr)
-        // {
-        //     AppendLight(i);
-        // }
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -117,7 +102,7 @@ void ComputeLightTiles(
 
     GroupMemoryBarrierWithGroupSync();
 
-    for (i = groupIndex; i < LightCount; i+= BLOCK_SIZE * BLOCK_SIZE)
+    for (i = groupIndex; i < LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
         _LightIndexData[LightIndexStartOffset + i] = LightList[i];
     }
@@ -135,35 +120,66 @@ inline Plane ComputePlane( float3 p0, float3 p1, float3 p2 )
     float3 v2 = p2 - p0;
  
     plane.Normal = normalize( cross( v0, v2 ) );
- 
-    // Compute the distance to the origin using p0.
-    plane.Distance = dot( plane.Normal, p0 );
+    plane.Distance = dot( p0, plane.Normal );
  
     return plane;
 }
+
+// [numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
+// void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
+// {
+//     const float3 eyePos = float3(0,0,0);
+
+//     float4 screenSpace[4];
+//     screenSpace[0] = float4(id.xy * BLOCK_SIZE, -1.0, 1.0);
+//     screenSpace[1] = float4((id.xy + float2(1, 0)) * BLOCK_SIZE, -1.0, 1.0);
+//     screenSpace[2] = float4((id.xy + float2(0, 1)) * BLOCK_SIZE, -1.0, 1.0);
+//     screenSpace[3] = float4((id.xy + float2(1, 1)) * BLOCK_SIZE, -1.0, 1.0);
+
+//     float3 viewSpace[4];
+//     [unroll]
+//     for (int i = 0; i < 4; i++)
+//     {
+//         viewSpace[i] = ScreenToView(screenSpace[i]).xyz;
+//     }
+
+//     Frustum frustum;
+//     frustum.planes[0] = ComputePlane(eyePos, viewSpace[2], viewSpace[0]);
+//     frustum.planes[1] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]);
+//     frustum.planes[2] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]);
+//     frustum.planes[3] = ComputePlane(eyePos, viewSpace[3], viewSpace[2]);
+
+//     if ( id.x <= uint(_NumThreads.x) && id.y <= uint(_NumThreads.y) )
+//     {
+//         uint index = id.x + (id.y * _NumThreads.x);
+//         _Frustum[index] = frustum;
+//     }
+// }
 
 [numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
 void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
 {
     const float3 eyePos = float3(0,0,0);
+    const float2 resrcp = rcp(_InputSize);
+    // const float2 resrcp = _InputSize;
 
-    float4 screenSpace[4];
-    screenSpace[0] = float4(id.xy * BLOCK_SIZE, -1.0, 1.0);
-    screenSpace[1] = float4(float2(id.x + 1.0, id.y) * BLOCK_SIZE, -1.0, 1.0);
-    screenSpace[2] = float4(float2(id.x, id.y + 1.0) * BLOCK_SIZE, -1.0, 1.0);
-    screenSpace[3] = float4(float2(id.x + 1.0, id.y + 1.0) * BLOCK_SIZE, -1.0, 1.0);
+    float2 screenSpace[4];
+    screenSpace[0] = id.xy * BLOCK_SIZE * resrcp.xy * 2 - 1;
+    screenSpace[1] = (id.xy + float2(1, 0)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
+    screenSpace[2] = (id.xy + float2(0, 1)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
+    screenSpace[3] = (id.xy + float2(1, 1)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
 
     float3 viewSpace[4];
     [unroll]
     for (int i = 0; i < 4; i++)
     {
-        viewSpace[i] = ScreenToView(screenSpace[i]).xyz;
+        viewSpace[i] = NDCToView(float4(screenSpace[i], 0, 1)).xyz;
     }
 
     Frustum frustum;
     frustum.planes[0] = ComputePlane(eyePos, viewSpace[2], viewSpace[0]);
-    frustum.planes[1] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]);
-    frustum.planes[2] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]);
+    frustum.planes[1] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]);
+    frustum.planes[2] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]);
     frustum.planes[3] = ComputePlane(eyePos, viewSpace[3], viewSpace[2]);
 
     if ( id.x < uint(_NumThreads.x) && id.y < uint(_NumThreads.y) )

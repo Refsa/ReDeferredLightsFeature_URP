@@ -86,7 +86,7 @@ uint _LightCount;
 // ### HELPER FUNCTIONS ###
 inline float3 WorldToViewPos(float3 pos)
 {
-    return mul(transpose(MATRIX_IV), float4(pos, 1.0)).xyz;
+    return mul(MATRIX_V, float4(pos, 1.0)).xyz;
 }
 
 inline float WorldTo01Depth(float3 pos)
@@ -115,9 +115,15 @@ inline float4 ClipToView(float4 clip)
 
 inline float4 ScreenToView(float4 screenPos)
 {
-    float2 texCoord = screenPos.xy / _InputSize;
+    float2 texCoord = screenPos.xy / rcp(_InputSize);
     float4 clip = float4(float2(texCoord.x, 1.0 - texCoord.y) * 2.0 - 1.0, screenPos.z, screenPos.w);
     return ClipToView(clip);
+}
+
+inline float4 NDCToView(float4 viewPos)
+{
+    float4 t = mul(MATRIX_IP, viewPos);
+    return t / t.w;
 }
 
 inline uint TextureSpaceToArray(uint2 id)

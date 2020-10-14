@@ -73,6 +73,7 @@ public class DeferredTilesPass : ScriptableRenderPass
 
         lightsCompute = ComputeShaderUtils.LightsCompute;
         tilesCompute = ComputeShaderUtils.TilesCompute;
+
         tileDataHandle.Init(TILE_DATA_ID);
 
         renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
@@ -92,8 +93,8 @@ public class DeferredTilesPass : ScriptableRenderPass
         width = Mathf.CeilToInt((float)textureWidth / TILE_SIZE_FLOAT); // g
         height = Mathf.CeilToInt((float)textureHeight / TILE_SIZE_FLOAT); // g
 
-        int newTileDispatchX = Mathf.CeilToInt(width / TILE_SIZE_FLOAT);  // G
-        int newTileDispatchY = Mathf.CeilToInt(height / TILE_SIZE_FLOAT); // G
+        int newTileDispatchX = Mathf.CeilToInt((float)width / TILE_SIZE_FLOAT);  // G
+        int newTileDispatchY = Mathf.CeilToInt((float)height / TILE_SIZE_FLOAT); // G
 
         refreshTiles = newTileDispatchX != tileDispatchX || newTileDispatchY != tileDispatchY;
         tileDispatchX = newTileDispatchX; // G
@@ -106,8 +107,9 @@ public class DeferredTilesPass : ScriptableRenderPass
         tileDataDescriptor.msaaSamples = 1;
         tileDataDescriptor.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R32G32_UInt;
         tileDataDescriptor.enableRandomWrite = true;
-        cmd.GetTemporaryRT(tileDataHandle.id, tileDataDescriptor);
+        cmd.GetTemporaryRT(tileDataHandle.id, tileDataDescriptor, FilterMode.Point);
 
+        cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height));
         cmd.SetComputeIntParam(tilesCompute, "_LightCount", DeferredLightsPass.LightCount);
         cmd.SetComputeTextureParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID, computeBuffers.FrustumDataBuffer);
@@ -119,12 +121,6 @@ public class DeferredTilesPass : ScriptableRenderPass
         cmd.SetComputeTextureParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
 
         cmd.SetGlobalTexture(TILE_DATA_ID, tileDataHandle.Identifier());
-
-        // ### COMPUTE FRUSTUMS ###
-        // if (refreshTiles)
-        {
-            cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, FRUSTUM_DATA_ID, computeBuffers.FrustumDataBuffer);
-        }
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -138,13 +134,14 @@ public class DeferredTilesPass : ScriptableRenderPass
             ref CameraData cameraData = ref renderingData.cameraData;
             Camera camera = cameraData.camera;
 
-            cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(camera.pixelWidth, camera.pixelHeight));
+            var ipmat = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false).inverse;
+
             cmd.SetComputeVectorParam(tilesCompute, "_CameraPos", camera.transform.position);
             cmd.SetComputeVectorParam(tilesCompute, "_ProjParams", new Vector4(
                     1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
                 ));
             cmd.SetComputeMatrixParam(tilesCompute, "_MVP", camera.projectionMatrix * camera.worldToCameraMatrix);
-            cmd.SetComputeMatrixParam(tilesCompute, "MATRIX_IP", camera.projectionMatrix.inverse);
+            cmd.SetComputeMatrixParam(tilesCompute, "MATRIX_IP", ipmat);
             cmd.SetComputeMatrixParam(tilesCompute, "MATRIX_V", camera.worldToCameraMatrix);
             cmd.SetComputeMatrixParam(tilesCompute, "MATRIX_IV", camera.cameraToWorldMatrix);
             cmd.SetComputeVectorParam(tilesCompute, "_NumThreads", new Vector2(width, height));
@@ -159,9 +156,8 @@ public class DeferredTilesPass : ScriptableRenderPass
         // ### COMPUTE FRUSTUMS ###
         // if (refreshTiles)
         {
-            // cmd.BeginSample("DeferredLightsPass: Compute Tile Frustums");
-            // cmd.DispatchCompute(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, width, height, 1);
-            // cmd.EndSample("DeferredLightsPass: Compute Tile Frustums");
+            cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, FRUSTUM_DATA_ID, computeBuffers.FrustumDataBuffer);
+            cmd.DispatchCompute(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, tileDispatchX, tileDispatchY, 1);
         }
 
         // ### COMPUTE PER TILE LIGHT DATA ###
@@ -216,6 +212,7 @@ public class DeferredTilesPass : ScriptableRenderPass
 
         this.lightDataBuffer = null;
         this.computeBuffers = null;
+
         cmd.ReleaseTemporaryRT(tileDataHandle.id);
     }
 }

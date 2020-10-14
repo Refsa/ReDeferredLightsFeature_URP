@@ -7,10 +7,12 @@ class DepthNormalsPass : ScriptableRenderPass
 {
     const string DEPTH_NORMAL_ID = "_DepthNormalsTexture";
     const string DEPTH_ID = "_Depth";
+    const string DEPTH_TEXTURE_ID = "_DepthTexture";
 
     Settings _settings;
 
     RenderTargetHandle depthHandle;
+    RenderTargetHandle depthTextureHandle;
 
     ShaderTagId shaderTagId;
     FilteringSettings filteringSettings;
@@ -29,6 +31,7 @@ class DepthNormalsPass : ScriptableRenderPass
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
         depthHandle.Init(DEPTH_ID);
+        depthTextureHandle.Init(DEPTH_TEXTURE_ID);
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -43,6 +46,15 @@ class DepthNormalsPass : ScriptableRenderPass
         depthDescriptor.width = width;
         depthDescriptor.height = height;
         cmd.GetTemporaryRT(depthHandle.id, depthDescriptor, FilterMode.Point);
+
+        var depthTextureDescriptor = new RenderTextureDescriptor(width, height);
+        depthTextureDescriptor.depthBufferBits = 32;
+        depthTextureDescriptor.msaaSamples = 1;
+        depthTextureDescriptor.colorFormat = RenderTextureFormat.Depth;
+        cmd.GetTemporaryRT(depthTextureHandle.id, depthTextureDescriptor, FilterMode.Point);
+        cmd.Blit(depthAttachment, depthTextureHandle.Identifier());
+        cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, DEPTH_TEXTURE_ID, depthTextureHandle.Identifier());
+        cmd.SetGlobalTexture(DEPTH_TEXTURE_ID, depthHandle.Identifier());
 
         ConfigureTarget(depthHandle.Identifier());
         ConfigureClear(ClearFlag.All, Color.black);
@@ -77,5 +89,6 @@ class DepthNormalsPass : ScriptableRenderPass
     public override void FrameCleanup(CommandBuffer cmd)
     {
         cmd.ReleaseTemporaryRT(depthHandle.id);
+        cmd.ReleaseTemporaryRT(depthTextureHandle.id);
     }
 }

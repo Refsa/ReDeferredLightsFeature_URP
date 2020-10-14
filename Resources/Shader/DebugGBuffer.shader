@@ -31,6 +31,8 @@
             sampler2D _BackBuffer_Image;
             float4 _BackBuffer_Image_ST;
 
+            sampler2D _DepthTexture;
+
             sampler2D _DeferredPass_DepthNormals_Texture;
             float4 _DeferredPass_DepthNormals_Texture_ST;
 
@@ -54,11 +56,14 @@
                 return o;
             }
 
+            static const float TileStrengthScale = 64.0;
+
             float4 frag (v2f i) : SV_Target
             {
                 float4 dnenc = tex2D(_DeferredPass_DepthNormals_Texture, i.uv);
-                float3 normal = 0; float depth = 0;
+                float3 normal = 0; float depth = 0; 
                 DecodeDepthNormal(dnenc, depth, normal);
+                // depth = tex2D(_DepthTexture, i.uv);
 
                 float4 specSmooth = tex2D(_DeferredPass_Specular_Texture, i.uv);
 
@@ -77,7 +82,7 @@
                     static const float3 highColor = float3(1,0,0);
 
                     uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
-                    float strength = tileData.y / 25.0;
+                    float strength = tileData.y / TileStrengthScale;
 
                     float3 color = lerp(lerp(lowColor, mediumColor, strength), highColor, strength);
                     // float3 color = strength;
@@ -87,7 +92,7 @@
                 else if (_DebugMode == 9)
                 {
                     uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
-                    float strength = tileData.y / 25.0;
+                    float strength = tileData.y / TileStrengthScale;
                     float4 bb = tex2D(_BackBuffer_Image, i.uv);
 
                     return float4(lerp(bb.rgb, strength, 0.05), 1.0);
