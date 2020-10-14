@@ -130,7 +130,6 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
 
-            cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, "_PixelData", pixelDataBuffer);
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_PixelData", pixelDataBuffer);
         }
 
@@ -156,12 +155,6 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.SetComputeVectorParam(_lightsCompute, "_ProjParams", new Vector4(
                 1f, camera.nearClipPlane, camera.farClipPlane, 1f / camera.farClipPlane
             ));
-        }
-        // ### PRE-COMPUTE PIXEL DATA ###
-        {
-            // cmd.BeginSample("DeferredLightsPass: Pre Compute Pixel Data");
-            // cmd.DispatchCompute(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, (int)passSize.x / 32, (int)passSize.y / 18, 1);
-            // cmd.EndSample("DeferredLightsPass: Pre Compute Pixel Data");
         }
         // ### DISPATCH LIGHT COMPUTE ###
         {

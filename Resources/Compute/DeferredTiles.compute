@@ -50,7 +50,6 @@ void ComputeLightTiles(
 
     int2 texCoord = id.xy;// + int2(BLOCK_SIZE, BLOCK_SIZE) * 0.25;
     float3 wpos = _WorldPositionsTexture.Load(int3(texCoord, 0));
-
     float dist = distance(_CameraPos, wpos);
     uint idist = asuint(dist);
 
@@ -74,6 +73,7 @@ void ComputeLightTiles(
 
     float minDist = asfloat(MinDist);
     float maxDist = asfloat(MaxDist);
+    float distDiff = maxDist - minDist;
 
     for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
@@ -83,7 +83,7 @@ void ComputeLightTiles(
         float sDepth = length(sDir);
         sDir = normalize(sDir);
         float sDepth2 = sDepth * sDepth;
-        
+
         float twobc = 2 * sDepth * maxDist;
         float c = sDepth2 + (maxDist * maxDist) - twobc * dot(PosDir, sDir);
 

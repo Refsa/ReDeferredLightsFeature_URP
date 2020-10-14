@@ -66,7 +66,7 @@ class AlbedoGrabPass : ScriptableRenderPass
 
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputePixelDataKernelID, ALBEDO_ID, albedoHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
         }
 
