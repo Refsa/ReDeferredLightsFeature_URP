@@ -17,11 +17,6 @@ class DeferredLightsPass : ScriptableRenderPass
     Vector2 passSize;
     Vector2 renderSize;
 
-    LightData[] lightDatas;
-    int lightCount;
-
-    public static int LightCount;
-
     public DeferredLightsPass(Settings settings)
     {
         renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
@@ -35,35 +30,7 @@ class DeferredLightsPass : ScriptableRenderPass
 
             colorFullscreenHandle.Init(colorFullscreenID);
         }
-
-        PrepareBuffers();
     } 
- 
-    public void PrepareBuffers() 
-    {
-        lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
-    }
-
-    public void PrepareLightDataBuffer()
-    {
-        // ### GET ALL LIGHTS IN SCENE ###
-        lightCount = 0;
-        foreach (var ld in GameObject.FindObjectsOfType<DeferredLightsData>())
-        {
-            if (!ld.gameObject.activeSelf) continue;
-
-            lightDatas[lightCount].Position = ld.transform.position;
-            lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
-            lightDatas[lightCount].Attenuation = ld.Attenuation;
-            lightDatas[lightCount].RangeSqr = ld.RangeSqr;
-
-            lightCount++;
-        }
-        LightCount = lightCount;
-
-        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer(DeferredLightsFeature.MAX_LIGHTS);
-        lightDataBuffer.SetData(lightDatas);
-    }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
@@ -116,10 +83,9 @@ class DeferredLightsPass : ScriptableRenderPass
 
         // ### SETUP LIGHT COMPUTE ###
         {
-            var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer(DeferredLightsFeature.MAX_LIGHTS);
+            var lightDataBuffer = ShaderData.instance.GetCullLightsOutputBuffer();
 
-            lightDataBuffer.SetData(lightDatas, 0, 0, lightCount);
-            cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
+            cmd.SetComputeIntParam(_lightsCompute, "_LightCount", CullLightsHandler.LightCount);
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
         }

@@ -81,7 +81,9 @@ struct DFLightData
 };
 
 StructuredBuffer<DFLightData> _LightData;
-uint _LightCount;
+cbuffer LightInfo {
+    uint _LightCount;
+};
 
 // ### HELPER FUNCTIONS ###
 inline float3 WorldToViewPos(float3 pos)

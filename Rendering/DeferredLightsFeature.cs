@@ -30,6 +30,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
     SpecularGrabPass specularGrabPass;
 
+    CullLightsHandler cullLightsHandler;
+
     DebugPass debugPass;
     Material debugMaterial;
 
@@ -49,6 +51,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
+        cullLightsHandler = new CullLightsHandler();
+
         lightsPass = new DeferredLightsPass(settings);
         tilesPass = new DeferredTilesPass(settings);
 
@@ -67,7 +71,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             return;
         }
 
-        lightsPass.PrepareLightDataBuffer();
+        cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
         renderer.EnqueuePass(albedoGrabPass);
         renderer.EnqueuePass(depthNormalsPass);

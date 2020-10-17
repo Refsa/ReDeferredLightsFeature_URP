@@ -6,18 +6,11 @@
 #define CULL_LIGHTS_BLOCK_SIZE 64
 
 inline bool SphereInsidePlane( float4 sphere, float4 plane );
-bool SphereInsideFrustum( float4 sphere );
-
-cbuffer CameraFrustum {
-    Plane _NearPlane;
-    Plane _FarPlane;
-    Plane _LeftPlane;
-    Plane _RightPlane;
-    Plane _UpPlane;
-    Plane _DownPlane;
-};
+inline bool SphereInsideFrustum( float4 sphere );
+inline bool PointInsideFrustum(float3 p);
 
 float4 _CameraFrustum[6];
+float2 _CameraClips;
 
 StructuredBuffer<DFLightData> _LightDataInput;
 AppendStructuredBuffer<DFLightData> _LightDataOutput;
@@ -25,6 +18,8 @@ AppendStructuredBuffer<DFLightData> _LightDataOutput;
 [numthreads(CULL_LIGHTS_BLOCK_SIZE,1,1)]
 void CullLights (uint3 id : SV_DispatchThreadID)
 {
+    [branch]if (id.x >= _LightCount) return;
+
     DFLightData ld = _LightDataInput[id.x];
 
     float4 sphere = float4(ld.Position, sqrt(ld.RangeSqr));
@@ -37,7 +32,7 @@ void CullLights (uint3 id : SV_DispatchThreadID)
 
 inline bool SphereInsidePlane( float4 sphere, float4 plane )
 {
-    return dot( plane.xyz, sphere.xyz ) - plane.w < -sphere.w;
+    return dot( -plane.xyz, sphere.xyz ) - plane.w > sphere.w;
 }
 
 bool SphereInsideFrustum( float4 sphere )

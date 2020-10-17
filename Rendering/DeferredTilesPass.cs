@@ -67,12 +67,12 @@ public class DeferredTilesPass : ScriptableRenderPass
         cmd.GetTemporaryRT(tileDataHandle.id, tileDataDescriptor, FilterMode.Point);
 
         var frustumDataBuffer = ShaderData.instance.GetFrustumDataBuffer(MAX_TILES);
-        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer();
+        var lightDataBuffer = ShaderData.instance.GetCullLightsOutputBuffer();
         var lightIndexCounterBuffer = ShaderData.instance.GetLightIndexCounterBuffer(1);
         var lightIndexBuffer = ShaderData.instance.GetLightIndexBuffer(MAX_LIGHTS_PER_TILE);
 
         cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height));
-        cmd.SetComputeIntParam(tilesCompute, "_LightCount", DeferredLightsPass.LightCount);
+        cmd.SetComputeIntParam(tilesCompute, "_LightCount", CullLightsHandler.LightCount);
         cmd.SetComputeTextureParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID, frustumDataBuffer);
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_DATA_ID, lightDataBuffer);

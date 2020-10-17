@@ -14,6 +14,7 @@ public class ShaderData : System.IDisposable
     ComputeBuffer frustumDataBuffer;
 
     ComputeBuffer cullLightsOutputBuffer;
+    ComputeBuffer lightCountReadBuffer;
 
     ShaderData() { }
 
@@ -60,19 +61,24 @@ public class ShaderData : System.IDisposable
         return GetOrUpdateBuffer(ref cullLightsOutputBuffer, size, Marshal.SizeOf<LightData>(), "CullLightsOutputBuffer", ComputeBufferType.Append);
     }
 
+    public ComputeBuffer GetLightCountReadBuffer()
+    {
+        return GetOrUpdateBuffer(ref lightCountReadBuffer, 1, sizeof(int), "LightCountReadBuffer", ComputeBufferType.IndirectArguments);
+    }
+
     ComputeBuffer GetOrUpdateBuffer(ref ComputeBuffer buffer, int size, int bytes, string name, ComputeBufferType bufferType = ComputeBufferType.Structured)
     {
         if (size == 0) return buffer;
 
         if (buffer == null)
         {
-            buffer = new ComputeBuffer(size, bytes);
+            buffer = new ComputeBuffer(size, bytes, bufferType);
             buffer.name = name;
         }
         else if (buffer.count < size)
         {
             buffer.Dispose();
-            buffer = new ComputeBuffer(size, bytes);
+            buffer = new ComputeBuffer(size, bytes, bufferType);
             buffer.name = name;
         }
 
@@ -87,6 +93,9 @@ public class ShaderData : System.IDisposable
         DisposeBuffer(ref lightIndexBuffer);
         DisposeBuffer(ref lightIndexCounterBuffer);
         DisposeBuffer(ref frustumDataBuffer);
+
+        DisposeBuffer(ref cullLightsOutputBuffer);
+        DisposeBuffer(ref lightCountReadBuffer);
     }
 
     public static void DisposeBuffer(ref ComputeBuffer buffer)

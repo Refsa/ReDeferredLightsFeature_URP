@@ -2,7 +2,10 @@ using UnityEngine;
 
 public class CullLightsHandler
 {
-    public CullLightsHandler() {}
+    public CullLightsHandler()
+    {
+        lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
+    }
 
     LightData[] lightDatas;
     int lightCount = 0;
@@ -11,23 +14,35 @@ public class CullLightsHandler
     Vector4[] lastFrustumPlanes = new Vector4[6];
     UnityEngine.Plane[] tempPlanes = new UnityEngine.Plane[6];
 
+    int[] lightCounter = new int[1] { 0 };
+
     public void CullLights(Camera camera)
     {
         PrepareLightDataBuffer();
         CreateCameraFrustum(camera, ref lastFrustumPlanes);
 
         var cullCompute = ComputeShaderUtils.CullLightsCompute;
-        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer(DeferredLightsFeature.MAX_LIGHTS);
+        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer();
         var outputDataBuffer = ShaderData.instance.GetCullLightsOutputBuffer(DeferredLightsFeature.MAX_LIGHTS);
+
+        outputDataBuffer.SetCounterValue(0u);
 
         cullCompute.SetBuffer(ComputeShaderUtils.CullLightsKernels.CullLightsKernelID, "_LightDataInput", lightDataBuffer);
         cullCompute.SetBuffer(ComputeShaderUtils.CullLightsKernels.CullLightsKernelID, "_LightDataOutput", outputDataBuffer);
         cullCompute.SetVectorArray("_CameraFrustum", lastFrustumPlanes);
-        cullCompute.SetFloat("_LightCount", lightCount);
+        cullCompute.SetInt("_LightCount", lightCount);
+        cullCompute.SetVector("_CameraClips", new Vector2(camera.nearClipPlane, camera.farClipPlane));
 
-        cullCompute.Dispatch(ComputeShaderUtils.CullLightsKernels.CullLightsKernelID, lightCount / 64, 1, 1);
+        int batchSize = Mathf.CeilToInt((float)lightCount / 64f);
+        cullCompute.Dispatch(ComputeShaderUtils.CullLightsKernels.CullLightsKernelID, batchSize, 1, 1);
 
-        LightCount = outputDataBuffer.count;
+        var lightCountBuffer = ShaderData.instance.GetLightCountReadBuffer();
+        ComputeBuffer.CopyCount(outputDataBuffer, lightCountBuffer, 0);
+        lightCountBuffer.GetData(lightCounter);
+
+        LightCount = lightCounter[0];
+
+        // UnityEngine.Debug.Log($"{camera.name}: In View: {LightCount} - Batch Size: {batchSize} - Lights In Scene: {lightCount}");
     }
 
     void PrepareLightDataBuffer()
