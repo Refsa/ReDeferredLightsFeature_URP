@@ -51,8 +51,6 @@ void ComputeLightTiles(
     uint i = 0;
     int2 texCoord = id.xy;
     float depth = _DepthTexture.Load(uint3(texCoord, 0)).r;
-    // float2 dnenc = _DepthNormalsTexture.Load(uint3(texCoord, 0)).zw;
-    // float depth = DecodeFloatRG(dnenc);
     
     uint idepth = asuint(depth);
 

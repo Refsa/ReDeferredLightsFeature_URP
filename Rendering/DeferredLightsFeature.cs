@@ -47,7 +47,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             throw new System.Exception("DeferredLightsFeature setup was not successful");
         }
 
-        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture");
+        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/DepthNormal");
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
@@ -68,14 +68,20 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     {
         if (error)
         {
-            return;
+            return; 
         }
 
-        if (debugMaterial == null)
+        // Reinit materials if they are lost in unity internal state change
         {
-            debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
+            if (debugMaterial == null) debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
+            debugPass.SetMaterial(debugMaterial);
+
+            if (worldPositionMaterial == null) worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
+            worldPositionPass.SetMaterial(worldPositionMaterial);
+
+            if (depthNormalsMaterial == null) depthNormalsMaterial = new Material(Shader.Find("Hidden/DepthNormal"));
+            depthNormalsPass.SetMaterial(depthNormalsMaterial);
         }
-        debugPass.SetMaterial(debugMaterial);
 
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
@@ -90,12 +96,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         renderer.EnqueuePass(debugPass);
     }
 
-    void OnDisable() 
+    void OnDisable()
     {
         ShaderData.instance.Dispose();
     }
 
-    void OnValidate() 
+    void OnValidate()
     {
         ShaderData.instance.Dispose();
     }

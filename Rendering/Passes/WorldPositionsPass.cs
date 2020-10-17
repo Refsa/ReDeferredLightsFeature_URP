@@ -32,6 +32,11 @@ class WorldPositionPass : ScriptableRenderPass
         wpHandle.Init(HANDLE_ID);
     }
 
+    public void SetMaterial(Material worldPositionMaterial)
+    {
+        _worldPositionMaterial = worldPositionMaterial;
+    }
+
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);

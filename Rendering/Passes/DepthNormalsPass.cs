@@ -34,6 +34,11 @@ class DepthNormalsPass : ScriptableRenderPass
         depthTextureHandle.Init(DEPTH_TEXTURE_ID);
     }
 
+    public void SetMaterial(Material depthNormalMaterial)
+    {
+        _depthNormalsMaterial = depthNormalMaterial;
+    }
+
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
