@@ -17,28 +17,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         public DebugMode DebugMode = DebugMode.None;
     }
 
-    public struct LightData
-    {
-        public Vector3 Position;
-        public Vector3 Color;
-        public Vector2 Attenuation;
-        public float RangeSqr;
-    }
-
-    public struct PixelData
-    {
-        public Vector3 Diffuse;
-        public Vector3 Normal;
-        public float Depth;
-        public Vector3 ViewDir;
-        public Vector3 Position;
-        public Vector3 Specular;
-        public float Roughness;
-        public float Roughness2;
-        public float Roughness2MinusOne;
-        public float NormalizationTerm;
-    };
-
     DeferredLightsPass lightsPass;
     DeferredTilesPass tilesPass;
 

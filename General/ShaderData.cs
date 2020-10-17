@@ -1,7 +1,6 @@
 
 using System.Runtime.InteropServices;
 using UnityEngine;
-using static DeferredLightsFeature;
 
 public class ShaderData : System.IDisposable
 {
@@ -13,6 +12,8 @@ public class ShaderData : System.IDisposable
     ComputeBuffer lightIndexBuffer;
     ComputeBuffer lightIndexCounterBuffer;
     ComputeBuffer frustumDataBuffer;
+
+    ComputeBuffer cullLightsOutputBuffer;
 
     ShaderData() { }
 
@@ -54,7 +55,12 @@ public class ShaderData : System.IDisposable
         return GetOrUpdateBuffer(ref frustumDataBuffer, size, sizeof(float) * 4 * 4, "FurstumDataBuffer");
     }
 
-    ComputeBuffer GetOrUpdateBuffer(ref ComputeBuffer buffer, int size, int bytes, string name)
+    public ComputeBuffer GetCullLightsOutputBuffer(int size = 0)
+    {
+        return GetOrUpdateBuffer(ref cullLightsOutputBuffer, size, Marshal.SizeOf<LightData>(), "CullLightsOutputBuffer", ComputeBufferType.Append);
+    }
+
+    ComputeBuffer GetOrUpdateBuffer(ref ComputeBuffer buffer, int size, int bytes, string name, ComputeBufferType bufferType = ComputeBufferType.Structured)
     {
         if (size == 0) return buffer;
 

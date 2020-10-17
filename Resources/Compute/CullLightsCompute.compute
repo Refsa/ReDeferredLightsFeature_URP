@@ -1,0 +1,56 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CullLights
+
+#include "Common.hlsl"
+
+#define CULL_LIGHTS_BLOCK_SIZE 64
+
+inline bool SphereInsidePlane( float4 sphere, float4 plane );
+bool SphereInsideFrustum( float4 sphere );
+
+cbuffer CameraFrustum {
+    Plane _NearPlane;
+    Plane _FarPlane;
+    Plane _LeftPlane;
+    Plane _RightPlane;
+    Plane _UpPlane;
+    Plane _DownPlane;
+};
+
+float4 _CameraFrustum[6];
+
+StructuredBuffer<DFLightData> _LightDataInput;
+AppendStructuredBuffer<DFLightData> _LightDataOutput;
+
+[numthreads(CULL_LIGHTS_BLOCK_SIZE,1,1)]
+void CullLights (uint3 id : SV_DispatchThreadID)
+{
+    DFLightData ld = _LightDataInput[id.x];
+
+    float4 sphere = float4(ld.Position, sqrt(ld.RangeSqr));
+
+    if (SphereInsideFrustum(sphere))
+    {
+        _LightDataOutput.Append(ld);
+    }
+}
+
+inline bool SphereInsidePlane( float4 sphere, float4 plane )
+{
+    return dot( plane.xyz, sphere.xyz ) - plane.w < -sphere.w;
+}
+
+bool SphereInsideFrustum( float4 sphere )
+{
+    bool result = true;
+ 
+    for ( int i = 0; i < 6 && result; i++ )
+    {
+        if ( SphereInsidePlane( sphere, _CameraFrustum[i] ) )
+        {
+            result = false;
+        }
+    }
+ 
+    return result;
+}

@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using Settings = DeferredLightsFeature.Settings;
-using LightData = DeferredLightsFeature.LightData;
 
 class DeferredLightsPass : ScriptableRenderPass
 {

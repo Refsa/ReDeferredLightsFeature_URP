@@ -6,6 +6,7 @@ public static class ComputeShaderUtils
     public static ComputeShader LightsCompute;
     public static ComputeShader UtilsCompute;
     public static ComputeShader TilesCompute;
+    public static ComputeShader CullLightsCompute;
 
     public static class LightsComputeKernels
     {
@@ -61,6 +62,16 @@ public static class ComputeShaderUtils
         }
     }
 
+    public static class CullLightsKernels
+    {
+        public static int CullLightsKernelID {get; private set;} = -1;
+
+        internal static void Prepare()
+        {
+            CullLightsKernelID = CullLightsCompute.FindKernel("CullLights");
+        }
+    }
+
     public static bool Prepare()
     {
         bool error = false;
@@ -86,6 +97,14 @@ public static class ComputeShaderUtils
         else 
         {
             UnityEngine.Debug.LogError($"ReLights URP: Couldn't load TilesCompute");
+            return error;
+        }
+
+        if (CullLightsCompute == null) error = !PrepareCompute("Compute/CullLightsCompute", ref CullLightsCompute);
+        if (!error) CullLightsKernels.Prepare();
+        else
+        {
+            UnityEngine.Debug.LogError($"ReLights URP: Couldn't load CullLightsCompute");
             return error;
         }
 

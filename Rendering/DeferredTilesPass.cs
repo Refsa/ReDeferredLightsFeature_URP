@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using Settings = DeferredLightsFeature.Settings;
-using LightData = DeferredLightsFeature.LightData;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -137,45 +136,8 @@ public class DeferredTilesPass : ScriptableRenderPass
         CommandBufferPool.Release(cmd);
     }
 
-    struct Plane
-    {
-        public Vector3 Normal;
-        public float Distance;
-    }
-
-    struct Frustum
-    {
-        public Plane Plane1;
-        public Plane Plane2;
-        public Plane Plane3;
-        public Plane Plane4;
-    }
-
-    struct FrustumEx
-    {
-        public Plane[] planes;
-    }
-
-    Frustum[] frustumData = new Frustum[MAX_TILES];
-
     public override void FrameCleanup(CommandBuffer cmd)
     {
-        // int tiles = width * height;
-        // computeBuffers.FrustumDataBuffer.GetData(frustumData, 0, 0, tiles);
-
-        // List<FrustumEx> frustums = new List<FrustumEx>();
-        // for (int i = 0; i < tiles; i++)
-        // {
-        //     var frustum = frustumData[i];
-        //     var frustumEx = new FrustumEx{planes = new Plane[4]};
-        //     frustumEx.planes[0] = frustum.Plane1; frustumEx.planes[1] = frustum.Plane2; frustumEx.planes[2] = frustum.Plane3; frustumEx.planes[3] = frustum.Plane4;
-        //     bool distinctPlanes = frustumEx.planes.Distinct().Count() == 4;
-        //     UnityEngine.Debug.Assert(distinctPlanes, $"planes in frustum was not unique");
-        // }
-
-        // int uniques = frustums.Distinct().Count();
-        // UnityEngine.Debug.Assert(uniques == tiles, $"dupes of frustums found: {tiles - uniques}");
-
         cmd.ReleaseTemporaryRT(tileDataHandle.id);
     }
 }
