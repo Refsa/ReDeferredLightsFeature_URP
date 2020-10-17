@@ -57,10 +57,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
     [SerializeField] Settings settings;
 
-    ComputeBuffer lightsDataBuffer;
-    ComputeBuffer pixelDataBuffer;
-    DeferredTilesPass.DeferredTilesBuffers deferredTilesBuffers;
-
     bool error = false;
 
     public override void Create()
@@ -74,9 +70,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/Internal-DepthNormalsTexture");
         worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
-
-        // lightsDataBuffer = new ComputeBuffer(MAX_LIGHTS, System.Runtime.InteropServices.Marshal.SizeOf<LightData>());
-        // pixelDataBuffer = new ComputeBuffer(2560*1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
 
         lightsPass = new DeferredLightsPass(settings);
         tilesPass = new DeferredTilesPass(settings);
@@ -96,20 +89,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             return;
         }
 
-        if (lightsDataBuffer == null)
-        {
-            lightsDataBuffer = new ComputeBuffer(MAX_LIGHTS, System.Runtime.InteropServices.Marshal.SizeOf<LightData>());
-            lightsDataBuffer.name = "LightsDataBuffer";
-        }
-        if (pixelDataBuffer == null)
-        {
-            pixelDataBuffer = new ComputeBuffer(2560 * 1440, System.Runtime.InteropServices.Marshal.SizeOf<PixelData>());
-            pixelDataBuffer.name = "PixelDataBuffer";
-        }
-        if (deferredTilesBuffers == null) deferredTilesBuffers = new DeferredTilesPass.DeferredTilesBuffers();
-
-        tilesPass.SetBuffers(ref lightsDataBuffer, ref deferredTilesBuffers);
-        lightsPass.SetBuffers(ref lightsDataBuffer, ref pixelDataBuffer);
         lightsPass.PrepareLightDataBuffer();
 
         renderer.EnqueuePass(albedoGrabPass);
@@ -123,19 +102,14 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         renderer.EnqueuePass(debugPass);
     }
 
-    void OnDisable()
+    void OnDisable() 
     {
-        lightsDataBuffer?.Release();
-        pixelDataBuffer?.Release();
-        deferredTilesBuffers?.Dispose();
+        ShaderData.instance.Dispose();
     }
 
-    void OnEnable()
+    void OnValidate() 
     {
-        if (error) return;
-        lightsDataBuffer?.Release();
-        pixelDataBuffer?.Release();
-        deferredTilesBuffers?.Dispose();
+        ShaderData.instance.Dispose();
     }
 }
 

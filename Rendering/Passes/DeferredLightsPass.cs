@@ -18,9 +18,6 @@ class DeferredLightsPass : ScriptableRenderPass
     Vector2 passSize;
     Vector2 renderSize;
 
-    ComputeBuffer lightDataBuffer;
-    ComputeBuffer pixelDataBuffer;
-
     LightData[] lightDatas;
     int lightCount;
 
@@ -48,12 +45,6 @@ class DeferredLightsPass : ScriptableRenderPass
         lightDatas = new LightData[DeferredLightsFeature.MAX_LIGHTS];
     }
 
-    public void SetBuffers(ref ComputeBuffer lightsBuffer, ref ComputeBuffer pixelDataBuffer)
-    {
-        this.lightDataBuffer = lightsBuffer;
-        this.pixelDataBuffer = pixelDataBuffer;
-    }
-
     public void PrepareLightDataBuffer()
     {
         // ### GET ALL LIGHTS IN SCENE ###
@@ -70,7 +61,8 @@ class DeferredLightsPass : ScriptableRenderPass
             lightCount++;
         }
         LightCount = lightCount;
-        // UnityEngine.Debug.Log($"{lightCount}");
+
+        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer(DeferredLightsFeature.MAX_LIGHTS);
         lightDataBuffer.SetData(lightDatas);
     }
 
@@ -125,12 +117,12 @@ class DeferredLightsPass : ScriptableRenderPass
 
         // ### SETUP LIGHT COMPUTE ###
         {
+            var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer(DeferredLightsFeature.MAX_LIGHTS);
+
             lightDataBuffer.SetData(lightDatas, 0, 0, lightCount);
             cmd.SetComputeIntParam(_lightsCompute, "_LightCount", lightCount);
             cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_LightData", lightDataBuffer);
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, lightsID, lightsHandle.Identifier());
-
-            cmd.SetComputeBufferParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, "_PixelData", pixelDataBuffer);
         }
 
         cmd.EndSample("DeferredLightsPass: Setup");
@@ -198,8 +190,5 @@ class DeferredLightsPass : ScriptableRenderPass
     {
         cmd.ReleaseTemporaryRT(lightsHandle.id);
         cmd.ReleaseTemporaryRT(colorFullscreenHandle.id);
-
-        lightDataBuffer = null;
-        pixelDataBuffer = null;
     }
 }

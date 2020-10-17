@@ -53,7 +53,7 @@ void ComputeLightTiles(
     // float2 dnenc = _DepthNormalsTexture.Load(uint3(texCoord, 0)).zw;
     // float depth = DecodeFloatRG(dnenc);
     
-    int idepth = asuint(1 - depth);
+    uint idepth = asuint(depth);
 
     if (groupIndex == 0)
     {
@@ -76,16 +76,16 @@ void ComputeLightTiles(
     float minDepth = asfloat(MinDepth);
     float maxDepth = asfloat(MaxDepth);
 
-    float minDepthVS = NDCToView(float4(0, 0, 1 - minDepth, 1)).z;
-    float maxDepthVS = NDCToView(float4(0, 0, 1 - maxDepth, 1)).z;
+    float minDepthVS = NDCToView(float4(0, 0, minDepth, minDepth)).z;
+    float maxDepthVS = NDCToView(float4(0, 0, maxDepth, _ProjParams.z)).z;
 
     for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
     {
         DFLightData ld = _LightData[i];
-
+        
         float3 lightViewPos = WorldToViewPos(ld.Position);
         Sphere sphere = {lightViewPos, sqrt(ld.RangeSqr)};
-
+        
         if (SphereInsideFrustum(sphere, GroupFrustum, minDepthVS, maxDepthVS))
         {
             AppendLight(i);
@@ -125,37 +125,6 @@ inline Plane ComputePlane( float3 p0, float3 p1, float3 p2 )
     return plane;
 }
 
-// [numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
-// void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
-// {
-//     const float3 eyePos = float3(0,0,0);
-
-//     float4 screenSpace[4];
-//     screenSpace[0] = float4(id.xy * BLOCK_SIZE, -1.0, 1.0);
-//     screenSpace[1] = float4((id.xy + float2(1, 0)) * BLOCK_SIZE, -1.0, 1.0);
-//     screenSpace[2] = float4((id.xy + float2(0, 1)) * BLOCK_SIZE, -1.0, 1.0);
-//     screenSpace[3] = float4((id.xy + float2(1, 1)) * BLOCK_SIZE, -1.0, 1.0);
-
-//     float3 viewSpace[4];
-//     [unroll]
-//     for (int i = 0; i < 4; i++)
-//     {
-//         viewSpace[i] = ScreenToView(screenSpace[i]).xyz;
-//     }
-
-//     Frustum frustum;
-//     frustum.planes[0] = ComputePlane(eyePos, viewSpace[2], viewSpace[0]);
-//     frustum.planes[1] = ComputePlane(eyePos, viewSpace[1], viewSpace[3]);
-//     frustum.planes[2] = ComputePlane(eyePos, viewSpace[0], viewSpace[1]);
-//     frustum.planes[3] = ComputePlane(eyePos, viewSpace[3], viewSpace[2]);
-
-//     if ( id.x <= uint(_NumThreads.x) && id.y <= uint(_NumThreads.y) )
-//     {
-//         uint index = id.x + (id.y * _NumThreads.x);
-//         _Frustum[index] = frustum;
-//     }
-// }
-
 [numthreads(BLOCK_SIZE,BLOCK_SIZE,1)]
 void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
 {
@@ -164,10 +133,10 @@ void ComputeTileFrustums(uint3 id : SV_DISPATCHTHREADID)
     // const float2 resrcp = _InputSize;
 
     float2 screenSpace[4];
-    screenSpace[0] = id.xy * BLOCK_SIZE * resrcp.xy * 2 - 1;
-    screenSpace[1] = (id.xy + float2(1, 0)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
-    screenSpace[2] = (id.xy + float2(0, 1)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
-    screenSpace[3] = (id.xy + float2(1, 1)) * BLOCK_SIZE * resrcp.xy * 2 - 1;
+    screenSpace[0] = id.xy * BLOCK_SIZE * resrcp.xy * float2(2, 2) - float2(1, 1);
+    screenSpace[1] = (id.xy + float2(1, 0)) * BLOCK_SIZE * resrcp.xy * float2(2, 2) - float2(1, 1);
+    screenSpace[2] = (id.xy + float2(0, 1)) * BLOCK_SIZE * resrcp.xy * float2(2, 2) - float2(1, 1);
+    screenSpace[3] = (id.xy + float2(1, 1)) * BLOCK_SIZE * resrcp.xy * float2(2, 2) - float2(1, 1);
 
     float3 viewSpace[4];
     [unroll]

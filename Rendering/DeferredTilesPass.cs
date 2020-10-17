@@ -8,39 +8,6 @@ using System.Collections.Generic;
 
 public class DeferredTilesPass : ScriptableRenderPass
 {
-    public class DeferredTilesBuffers : System.IDisposable
-    {
-        public ComputeBuffer LightIndexBuffer { get; private set; }
-        public ComputeBuffer LightIndexCounterBuffer { get; private set; }
-        public ComputeBuffer FrustumDataBuffer { get; private set; }
-
-        public void Dispose()
-        {
-            LightIndexBuffer?.Release();
-            LightIndexCounterBuffer?.Release();
-            FrustumDataBuffer?.Release();
-        }
-
-        public DeferredTilesBuffers()
-        {
-            if (FrustumDataBuffer == null)
-            {
-                FrustumDataBuffer = new ComputeBuffer(MAX_TILES, sizeof(float) * 4 * 4);
-                FrustumDataBuffer.name = "FrustumDataBuffer";
-            }
-            if (LightIndexBuffer == null)
-            {
-                LightIndexBuffer = new ComputeBuffer(MAX_LIGHTS_PER_TILE, sizeof(uint) * 1);
-                LightIndexBuffer.name = "LightIndexBuffer";
-            }
-            if (LightIndexCounterBuffer == null)
-            {
-                LightIndexCounterBuffer = new ComputeBuffer(1, sizeof(uint) * 1);
-                LightIndexCounterBuffer.name = "LightIndexCounterBuffer";
-            }
-        }
-    }
-
     const string TILE_DATA_ID = "_TileData";
     const string FRUSTUM_DATA_ID = "_Frustum";
     const string LIGHT_DATA_ID = "_LightData";
@@ -55,9 +22,6 @@ public class DeferredTilesPass : ScriptableRenderPass
 
     ComputeShader tilesCompute;
     ComputeShader lightsCompute;
-
-    DeferredTilesBuffers computeBuffers;
-    ComputeBuffer lightDataBuffer;
 
     RenderTargetHandle tileDataHandle;
 
@@ -77,12 +41,6 @@ public class DeferredTilesPass : ScriptableRenderPass
         tileDataHandle.Init(TILE_DATA_ID);
 
         renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
-    }
-
-    public void SetBuffers(ref ComputeBuffer lightDataBuffer, ref DeferredTilesBuffers buffers)
-    {
-        this.lightDataBuffer = lightDataBuffer;
-        this.computeBuffers = buffers;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -109,15 +67,20 @@ public class DeferredTilesPass : ScriptableRenderPass
         tileDataDescriptor.enableRandomWrite = true;
         cmd.GetTemporaryRT(tileDataHandle.id, tileDataDescriptor, FilterMode.Point);
 
+        var frustumDataBuffer = ShaderData.instance.GetFrustumDataBuffer(MAX_TILES);
+        var lightDataBuffer = ShaderData.instance.GetLightsDataBuffer();
+        var lightIndexCounterBuffer = ShaderData.instance.GetLightIndexCounterBuffer(1);
+        var lightIndexBuffer = ShaderData.instance.GetLightIndexBuffer(MAX_LIGHTS_PER_TILE);
+
         cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height));
         cmd.SetComputeIntParam(tilesCompute, "_LightCount", DeferredLightsPass.LightCount);
         cmd.SetComputeTextureParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
-        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID, computeBuffers.FrustumDataBuffer);
+        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID, frustumDataBuffer);
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_DATA_ID, lightDataBuffer);
-        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_ID, computeBuffers.LightIndexBuffer);
-        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_COUNTER_ID, computeBuffers.LightIndexCounterBuffer);
+        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_ID, lightIndexBuffer);
+        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_COUNTER_ID, lightIndexCounterBuffer);
 
-        cmd.SetComputeBufferParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, LIGHT_INDEX_ID, computeBuffers.LightIndexBuffer);
+        cmd.SetComputeBufferParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, LIGHT_INDEX_ID, lightIndexBuffer);
         cmd.SetComputeTextureParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
 
         cmd.SetGlobalTexture(TILE_DATA_ID, tileDataHandle.Identifier());
@@ -150,13 +113,16 @@ public class DeferredTilesPass : ScriptableRenderPass
 
         // ### RESET DATA ###
         {
-            computeBuffers.LightIndexCounterBuffer.SetData(tileIndexCounterClear);
+            var lightIndexCounterBuffer = ShaderData.instance.GetLightIndexCounterBuffer(1);
+
+            lightIndexCounterBuffer.SetData(tileIndexCounterClear);
         }
 
         // ### COMPUTE FRUSTUMS ###
         // if (refreshTiles)
         {
-            cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, FRUSTUM_DATA_ID, computeBuffers.FrustumDataBuffer);
+            var frustumDataBuffer = ShaderData.instance.GetFrustumDataBuffer(MAX_TILES);
+            cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, FRUSTUM_DATA_ID, frustumDataBuffer);
             cmd.DispatchCompute(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, tileDispatchX, tileDispatchY, 1);
         }
 
@@ -209,9 +175,6 @@ public class DeferredTilesPass : ScriptableRenderPass
 
         // int uniques = frustums.Distinct().Count();
         // UnityEngine.Debug.Assert(uniques == tiles, $"dupes of frustums found: {tiles - uniques}");
-
-        this.lightDataBuffer = null;
-        this.computeBuffers = null;
 
         cmd.ReleaseTemporaryRT(tileDataHandle.id);
     }

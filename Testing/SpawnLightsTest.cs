@@ -36,4 +36,21 @@ public class SpawnLightsTest : MonoBehaviour
             GameObject.DestroyImmediate(transform.GetChild(0).gameObject);
         }
     }
+
+    void OnGUI() 
+    {
+        Rect rect = new Rect(Screen.width - 200f, 50f, 150f, 75f);
+
+        using (new GUILayout.AreaScope(rect))
+        {
+            GUILayout.Label($"Light Count ({lightCount})");
+            lightCount = (int)GUILayout.HorizontalSlider(lightCount, 1, 1 << 16);
+
+            if (GUILayout.Button("Respawn Lights"))
+            {
+                DeleteLights();
+                SpawnLights();
+            }
+        }
+    }
 }
