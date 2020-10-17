@@ -27,6 +27,7 @@
 
             uint _DebugMode;
             float4x4 MATRIX_IV;
+            uint _LightCount;
 
             sampler2D _BackBuffer_Image;
             float4 _BackBuffer_Image_ST;
@@ -48,6 +49,8 @@
             Texture2D<uint2> _TileData;
             sampler2D sampler_TileData;
 
+            sampler2D _HeatmapTexture;
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -56,7 +59,7 @@
                 return o;
             }
 
-            static const float TileStrengthScale = 64.0;
+            static const float TileStrengthScale = 256.0;
 
             float4 frag (v2f i) : SV_Target
             {
@@ -77,15 +80,10 @@
                 else if (_DebugMode == 7) return float4(specSmooth.a, specSmooth.a, specSmooth.a, 1.0);
                 else if (_DebugMode == 8)
                 {   
-                    static const float3 lowColor = float3(0,1,0);
-                    static const float3 mediumColor = float3(1,1,0);
-                    static const float3 highColor = float3(1,0,0);
-
                     uint2 tileData = _TileData.Load(float3(i.uv * _ScreenParams.xy * rcp(16), 0));
                     float strength = tileData.y / TileStrengthScale;
 
-                    float3 color = lerp(lerp(lowColor, mediumColor, strength), highColor, strength);
-                    // float3 color = strength;
+                    float3 color = tex2D(_HeatmapTexture, float2(strength, 0.5)).rgb;
 
                     return float4(color * 0.25, 1.0);
                 }

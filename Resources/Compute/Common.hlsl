@@ -78,6 +78,7 @@ struct DFLightData
     float3 Color;
     float2 Attenuation;
     float RangeSqr;
+    float Range;
 };
 
 StructuredBuffer<DFLightData> _LightData;

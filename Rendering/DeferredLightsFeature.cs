@@ -71,6 +71,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             return;
         }
 
+        if (debugMaterial == null)
+        {
+            debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
+        }
+        debugPass.SetMaterial(debugMaterial);
+
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
         renderer.EnqueuePass(albedoGrabPass);

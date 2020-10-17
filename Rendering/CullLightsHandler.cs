@@ -57,6 +57,7 @@ public class CullLightsHandler
             lightDatas[lightCount].Color = new Vector3(ld.Color.r, ld.Color.g, ld.Color.b);
             lightDatas[lightCount].Attenuation = ld.Attenuation;
             lightDatas[lightCount].RangeSqr = ld.RangeSqr;
+            lightDatas[lightCount].Range = ld.Range;
 
             lightCount++;
         }

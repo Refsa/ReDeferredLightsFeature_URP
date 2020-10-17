@@ -22,6 +22,7 @@ public struct LightData
     public Vector3 Color;
     public Vector2 Attenuation;
     public float RangeSqr;
+    public float Range;
 }
 
 public struct PixelData

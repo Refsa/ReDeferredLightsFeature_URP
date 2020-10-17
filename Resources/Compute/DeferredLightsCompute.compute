@@ -50,9 +50,10 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
 // #### LIGHTS START HERE ####
 // ###########################
 
-RWStructuredBuffer<uint> _LightIndexData;
-RWTexture2D<uint2> _TileData;
+StructuredBuffer<uint> _LightIndexData_static;
+Texture2D<uint2> _TileData_static;
 
+// Unity
 inline float3 DirectBRDF_float(PixelData pd, float3 lightDir)
 {
     float3 halfDir = normalize(lightDir + pd.ViewDir);
@@ -67,6 +68,7 @@ inline float3 DirectBRDF_float(PixelData pd, float3 lightDir)
     return color;
 }
 
+// Unity
 inline float3 LightingPhysicallyBased_float(PixelData pd, float attenuation, float3 lightDir, float3 lightCol)
 {
     float NdotL = remap(saturate(dot(pd.Normal, lightDir)));
@@ -74,6 +76,7 @@ inline float3 LightingPhysicallyBased_float(PixelData pd, float attenuation, flo
     return DirectBRDF_float(pd, lightDir) * radiance;
 }
 
+// Unity
 inline float DistanceAttenuation(float distSqr, float2 distAtten) 
 {
     float lightAtten = rcp(distSqr);
@@ -92,11 +95,8 @@ void ComputeLights (
     uint3 groupThreadID : SV_GROUPTHREADID)
 {    
     uint2 tileIndex = id.xy / BLOCK_SIZE;
-    uint lightStart = _TileData[tileIndex].x;
-    uint lightCount = _TileData[tileIndex].y;
-
-    // PixelData pd = _PixelData[TextureSpaceToArray(id.xy)];
-    // float3 worldPos = pd.Position;
+    uint lightStart = _TileData_static[tileIndex].x;
+    uint lightCount = _TileData_static[tileIndex].y;
 
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
@@ -106,42 +106,44 @@ void ComputeLights (
         return;
     }
 
-    float4 depthNormal = _DepthNormalsTexture[id.xy];
-    float4 specular = _SpecularTexture[id.xy];
-    float3 albedo = _AlbedoTexture[id.xy].rgb;
-
-    float depth = DecodeFloatRG(depthNormal.zw);
-    float3 normal = DecodeNormal(depthNormal);
-    normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
-
-    float roughness = specular.w;
-    float normalizationTerm = roughness * 4.0 + 2.0;
-    float roughness2 = roughness * roughness;
-    float roughness2MinusOne = roughness2 - 1.0;
-    float3 vdir = normalize(_CameraPos - worldPos);
-
     PixelData pd = (PixelData)0;
-    pd.Diffuse = albedo;
-    pd.Normal = normal;
-    pd.Depth = depth;
-    pd.ViewDir = vdir;
-    pd.Position = worldPos;
-    pd.Specular = specular.rgb;
-    pd.Roughness = roughness;
-    pd.Roughness2 = roughness2;
-    pd.Roughness2MinusOne = roughness2MinusOne;
-    pd.NormalizationTerm = normalizationTerm;
+
+    // Set pixel data
+    {
+        float4 depthNormal = _DepthNormalsTexture[id.xy];
+        float4 specular = _SpecularTexture[id.xy];
+        float3 albedo = _AlbedoTexture[id.xy].rgb;
+
+        float depth = DecodeFloatRG(depthNormal.zw);
+        float3 normal = DecodeNormal(depthNormal);
+        normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+
+        float roughness = specular.w;
+        float normalizationTerm = roughness * 4.0 + 2.0;
+        float roughness2 = roughness * roughness;
+        float roughness2MinusOne = roughness2 - 1.0;
+        float3 vdir = normalize(_CameraPos - worldPos);
+
+        pd.Diffuse = albedo;
+        pd.Normal = normal;
+        pd.Depth = depth;
+        pd.ViewDir = vdir;
+        pd.Position = worldPos;
+        pd.Specular = specular.rgb;
+        pd.Roughness = roughness;
+        pd.Roughness2 = roughness2;
+        pd.Roughness2MinusOne = roughness2MinusOne;
+        pd.NormalizationTerm = normalizationTerm;
+    }
 
     float4 accLight = 0, col = 0;
     float3 ldir = 0;
     float atten = 0, intensity = 0, dist = 0;
     DFLightData ld = (DFLightData)0;
 
-    col.a = 1.0;
-     
     [loop] for (uint i = 0; i < lightCount; i++)
     {
-        uint lightIndex = _LightIndexData[lightStart + i];
+        uint lightIndex = _LightIndexData_static[lightStart + i];
         ld = _LightData[lightIndex];
          
         ldir = (ld.Position - worldPos);
@@ -158,6 +160,9 @@ void ComputeLights (
 
     _DeferredLightsTexture[id.xy] = accLight;
 } 
+
+RWStructuredBuffer<uint> _LightIndexData;
+RWTexture2D<uint2> _TileData;
 
 [numthreads(32, 32, 1)]
 void ComputePixelData(uint3 id : SV_DispatchThreadID)

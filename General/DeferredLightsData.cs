@@ -14,6 +14,7 @@ public class DeferredLightsData : MonoBehaviour
 
     public Color Color => color * intensity;
     public float RangeSqr => range * range;
+    public float Range => range;
     public Vector2 Attenuation
     {
         get

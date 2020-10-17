@@ -10,15 +10,25 @@ class DebugPass : ScriptableRenderPass
     Settings _settings;
     Material _debugMaterial;
 
+    static Texture2D heatmapTexture;
+
     public DebugPass(Settings settings, Material debugMaterial)
     {
         _settings = settings;
+        _debugMaterial = debugMaterial;
+
+        if (heatmapTexture is null)
+            heatmapTexture = Resources.Load<Texture2D>("Textures/tdr_heatmap") as Texture2D;
+    }
+
+    public void SetMaterial(Material debugMaterial)
+    {
         _debugMaterial = debugMaterial;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        renderPassEvent = RenderPassEvent.AfterRendering;
+        renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -33,6 +43,7 @@ class DebugPass : ScriptableRenderPass
         cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
 #endif
 
+        cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
         ref CameraData cameraData = ref renderingData.cameraData;
 
         Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;

@@ -74,13 +74,13 @@ public class DeferredTilesPass : ScriptableRenderPass
         cmd.SetComputeVectorParam(tilesCompute, "_InputSize", new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height));
         cmd.SetComputeIntParam(tilesCompute, "_LightCount", CullLightsHandler.LightCount);
         cmd.SetComputeTextureParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
-        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID, frustumDataBuffer);
+        cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, FRUSTUM_DATA_ID + "_static", frustumDataBuffer);
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_DATA_ID, lightDataBuffer);
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_ID, lightIndexBuffer);
         cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, LIGHT_INDEX_COUNTER_ID, lightIndexCounterBuffer);
 
-        cmd.SetComputeBufferParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, LIGHT_INDEX_ID, lightIndexBuffer);
-        cmd.SetComputeTextureParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, TILE_DATA_ID, tileDataHandle.Identifier());
+        cmd.SetComputeBufferParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, LIGHT_INDEX_ID + "_static", lightIndexBuffer);
+        cmd.SetComputeTextureParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, TILE_DATA_ID + "_static", tileDataHandle.Identifier());
 
         cmd.SetGlobalTexture(TILE_DATA_ID, tileDataHandle.Identifier());
     }

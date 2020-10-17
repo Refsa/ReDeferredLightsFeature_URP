@@ -22,6 +22,7 @@ Texture2D _DepthTexture;
 // #########################
 // ### COMPUTE TILE DATA ###
 // #########################
+StructuredBuffer<Frustum> _Frustum_static;
 
 groupshared uint LightCount;
 groupshared uint LightIndexStartOffset;
@@ -63,7 +64,7 @@ void ComputeLightTiles(
         MinDepth = 0xffffffff;
         MaxDepth = 0;
 
-        GroupFrustum = _Frustum[groupID.x + (groupID.y * _NumThreads.x)];
+        GroupFrustum = _Frustum_static[groupID.x + (groupID.y * _NumThreads.x)];
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -84,7 +85,7 @@ void ComputeLightTiles(
         DFLightData ld = _LightData[i];
         
         float3 lightViewPos = WorldToViewPos(ld.Position);
-        Sphere sphere = {lightViewPos, sqrt(ld.RangeSqr)};
+        Sphere sphere = {lightViewPos, ld.Range};
         
         if (SphereInsideFrustum(sphere, GroupFrustum, minDepthVS, maxDepthVS))
         {

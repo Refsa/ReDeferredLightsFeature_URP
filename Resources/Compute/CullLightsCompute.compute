@@ -22,7 +22,7 @@ void CullLights (uint3 id : SV_DispatchThreadID)
 
     DFLightData ld = _LightDataInput[id.x];
 
-    float4 sphere = float4(ld.Position, sqrt(ld.RangeSqr));
+    float4 sphere = float4(ld.Position, ld.Range);
 
     if (SphereInsideFrustum(sphere))
     {
