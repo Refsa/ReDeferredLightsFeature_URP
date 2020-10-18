@@ -1858,7 +1858,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 553696893}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -35, y: 100, z: -540}
+  m_LocalPosition: {x: -35, y: 13, z: -540}
   m_LocalScale: {x: 300, y: 300, z: 300}
   m_Children: []
   m_Father: {fileID: 0}
@@ -5985,7 +5985,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   lightPrefab: {fileID: 8420427345038549157, guid: 87abaaf9609693747b0948d0a8c74751,
     type: 3}
-  lightCount: 8192
+  lightCount: 1024
   lightRange: 1200
 --- !u!1 &2086828475
 GameObject:

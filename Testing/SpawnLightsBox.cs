@@ -2,37 +2,48 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SpawnLightsTest : MonoBehaviour
+[RequireComponent(typeof(BoxCollider))]
+public class SpawnLightsBox : MonoBehaviour
 {
     [SerializeField] GameObject lightPrefab;
     [SerializeField] int lightCount = 128;
-    [SerializeField] float lightRange = 100f;
 
     [Header("Light Data")]
     [SerializeField] Vector2 sizeRange = new Vector2(5f, 200f);
     [SerializeField] Vector2 intensityRange = new Vector2(1f, 5f);
 
+    BoxCollider boxCollider;
+
     void Start() 
     {
         DeleteLights();
-        SpawnLights();    
+        SpawnLights();
     }
 
     public void SpawnLights()
     {
+        boxCollider = GetComponent<BoxCollider>();
+        Vector3 halfSize = boxCollider.size * 0.5f;
+
         for (int i = 0; i < lightCount; i++)
         {
             var go = GameObject.Instantiate(lightPrefab, transform);
 
-            Vector2 pos = Random.insideUnitCircle * lightRange;
+            Vector3 pos = 
+                new Vector3(
+                    Random.Range(-halfSize.x, halfSize.x),
+                    Random.Range(-halfSize.y, halfSize.y),
+                    Random.Range(-halfSize.z, halfSize.z)
+                );
+
+            go.transform.position = transform.position + boxCollider.center + pos;
 
             float range = Random.Range(sizeRange.x, sizeRange.y);
-
-            go.transform.position = new Vector3(pos.x, range * 0.25f, pos.y);
-
             var light = go.GetComponent<DeferredLightsData>();
             light.SetData(Random.ColorHSV(), Random.Range(intensityRange.x, intensityRange.y), range);
         }
+
+        SendMessage("SpawnedLights", SendMessageOptions.DontRequireReceiver);
     }
 
     public void DeleteLights()

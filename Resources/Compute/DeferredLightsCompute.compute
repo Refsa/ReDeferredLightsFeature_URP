@@ -71,7 +71,7 @@ inline float3 DirectBRDF_float(PixelData pd, float3 lightDir)
 // Unity
 inline float3 LightingPhysicallyBased_float(PixelData pd, float attenuation, float3 lightDir, float3 lightCol)
 {
-    float NdotL = remap(saturate(dot(pd.Normal, lightDir)));
+    float NdotL = saturate(dot(pd.Normal, lightDir));
     float3 radiance = lightCol * (attenuation * NdotL);
     return DirectBRDF_float(pd, lightDir) * radiance;
 }
@@ -160,9 +160,6 @@ void ComputeLights (
 
     _DeferredLightsTexture[id.xy] = accLight;
 } 
-
-RWStructuredBuffer<uint> _LightIndexData;
-RWTexture2D<uint2> _TileData;
 
 [numthreads(32, 32, 1)]
 void ComputePixelData(uint3 id : SV_DispatchThreadID)

@@ -26,7 +26,7 @@ struct Plane {
 };
 
 struct Frustum {
-    Plane planes[4];
+    Plane planes[4]; // L R U D
 };
 
 struct Box {
@@ -34,25 +34,10 @@ struct Box {
     float3 MaxCorner;
 };
 
-bool SphereIntersectsBox(Sphere sphere, Box box)
-{
-    float dmin = 0;
-    for (uint i = 0; i < 3; i++)
-    {
-        if (sphere.Center[i] < box.MinCorner[i]) dmin += sqrt(sphere.Center[i] - box.MinCorner[i]);
-        else if (sphere.Center[i] > box.MaxCorner[i]) dmin += sqrt(sphere.Center[i] - box.MaxCorner[i]);
-    }
-
-    return dmin <= sphere.Radius;
-}
-
-bool SphereIntersectsSphere(Sphere sphere1, Sphere sphere2)
-{
-    float3 diff = (sphere1.Center - sphere2.Center);
-    float distSqr = dot(diff, diff);
-
-    return (sphere1.Radius + sphere2.Radius) >= distSqr;
-}
+struct AABB {
+    float3 Center;
+    float3 Extents;
+};
 
 // ### PIXEL DATA ###
 struct PixelData
@@ -188,4 +173,33 @@ bool SphereInsideFrustum( Sphere sphere, Frustum frustum, float zNear, float zFa
     }
  
     return result;
+}
+
+bool SphereIntersectsAABB(Sphere sphere, AABB aabb)
+{
+    float3 vDelta = max(0, abs(aabb.Center - sphere.Center) - aabb.Extents);
+
+    float distSqr = dot(vDelta, vDelta);
+
+    return distSqr <= (sphere.Radius * sphere.Radius);
+}
+
+bool SphereIntersectsBox(Sphere sphere, Box box)
+{
+    float dmin = 0;
+    for (uint i = 0; i < 3; i++)
+    {
+        if (sphere.Center[i] < box.MinCorner[i]) dmin += sqrt(sphere.Center[i] - box.MinCorner[i]);
+        else if (sphere.Center[i] > box.MaxCorner[i]) dmin += sqrt(sphere.Center[i] - box.MaxCorner[i]);
+    }
+
+    return dmin <= sphere.Radius;
+}
+
+bool SphereIntersectsSphere(Sphere sphere1, Sphere sphere2)
+{
+    float3 diff = (sphere1.Center - sphere2.Center);
+    float distSqr = dot(diff, diff);
+
+    return (sphere1.Radius + sphere2.Radius) >= distSqr;
 }

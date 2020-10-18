@@ -33,7 +33,7 @@ public class CullLightsHandler
         cullCompute.SetInt("_LightCount", lightCount);
         cullCompute.SetVector("_CameraClips", new Vector2(camera.nearClipPlane, camera.farClipPlane));
 
-        int batchSize = Mathf.CeilToInt((float)lightCount / 64f);
+        int batchSize = Mathf.Max(Mathf.CeilToInt((float)lightCount / 64f), 1);
         cullCompute.Dispatch(ComputeShaderUtils.CullLightsKernels.CullLightsKernelID, batchSize, 1, 1);
 
         var lightCountBuffer = ShaderData.instance.GetLightCountReadBuffer();

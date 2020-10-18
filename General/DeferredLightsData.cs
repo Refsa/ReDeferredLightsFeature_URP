@@ -31,7 +31,7 @@ public class DeferredLightsData : MonoBehaviour
     }
 
     public void SetData(Color color, float intensity, float range)
-    {
+    { 
         this.color = color;
         this.intensity = intensity;
         this.range = range;
@@ -39,12 +39,12 @@ public class DeferredLightsData : MonoBehaviour
 
     void Awake()
     {
-        if (randomData)
-        {
-            color = Random.ColorHSV();
-            range = Random.Range(5f, 100f);
-            intensity = Random.Range(1f, 5f);
-        }
+        // if (randomData)
+        // {
+        //     color = Random.ColorHSV();
+        //     range = Random.Range(5f, 100f);
+        //     intensity = Random.Range(1f, 5f);
+        // }
     }
 
     void OnDrawGizmos()
@@ -58,7 +58,7 @@ public class DeferredLightsData : MonoBehaviour
         }
 
         Gizmos.color = color;
-        Gizmos.DrawSphere(transform.position, 1f);
+        Gizmos.DrawSphere(transform.position, Mathf.Min(5f, range * 0.05f));
         Gizmos.DrawWireSphere(transform.position, range);
     }
 

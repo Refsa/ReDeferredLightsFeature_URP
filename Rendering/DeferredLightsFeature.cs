@@ -18,6 +18,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     }
 
     DeferredLightsPass lightsPass;
+    Material blitLightsMaterial;
     DeferredTilesPass tilesPass;
 
     DepthNormalsPass depthNormalsPass;
@@ -81,6 +82,9 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
             if (depthNormalsMaterial == null) depthNormalsMaterial = new Material(Shader.Find("Hidden/DepthNormal"));
             depthNormalsPass.SetMaterial(depthNormalsMaterial);
+
+            if (blitLightsMaterial == null) blitLightsMaterial = new Material(Shader.Find("Hidden/BlitLights"));
+            lightsPass.SetMaterial(blitLightsMaterial);
         }
 
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
