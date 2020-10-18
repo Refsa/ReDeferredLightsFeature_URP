@@ -83,11 +83,12 @@ public class DeferredTilesPass : ScriptableRenderPass
         cmd.SetComputeTextureParam(lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, TILE_DATA_ID + "_static", tileDataHandle.Identifier());
 
         cmd.SetGlobalTexture(TILE_DATA_ID, tileDataHandle.Identifier());
+        cmd.SetGlobalBuffer(LIGHT_INDEX_ID, lightIndexBuffer);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
     {
-        var cmd = CommandBufferPool.Get();
+        var cmd = CommandBufferPool.Get("DeferredTilesPass");
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 

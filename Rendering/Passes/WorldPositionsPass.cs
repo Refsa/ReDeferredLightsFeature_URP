@@ -44,14 +44,14 @@ class WorldPositionPass : ScriptableRenderPass
 
         wpDescriptor = cameraTextureDescriptor;
         wpDescriptor.colorFormat = RenderTextureFormat.ARGBFloat;
-        wpDescriptor.depthBufferBits = 32;
+        wpDescriptor.depthBufferBits = 1;
         wpDescriptor.msaaSamples = 1;
         wpDescriptor.width = width;
         wpDescriptor.height = height;
         cmd.GetTemporaryRT(wpHandle.id, wpDescriptor, FilterMode.Point);
 
         ConfigureTarget(wpHandle.Identifier());
-        ConfigureClear(ClearFlag.All, Color.clear);
+        ConfigureClear(ClearFlag.None, Color.clear);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)

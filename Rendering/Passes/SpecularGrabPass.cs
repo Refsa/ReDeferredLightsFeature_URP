@@ -41,13 +41,13 @@ class SpecularGrabPass : ScriptableRenderPass
         rtd.colorFormat = RenderTextureFormat.ARGB32;
         rtd.width = width;
         rtd.height = height;
-        rtd.depthBufferBits = 32;
+        rtd.depthBufferBits = 1;
         rtd.msaaSamples = 1;
         rtd.enableRandomWrite = true;
         cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
 
         ConfigureTarget(specularHandle.Identifier());
-        ConfigureClear(ClearFlag.All, Color.black);
+        ConfigureClear(ClearFlag.None, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)

@@ -41,7 +41,7 @@ class AlbedoGrabPass : ScriptableRenderPass
         rtd.colorFormat = RenderTextureFormat.ARGB32;
         rtd.width = width;
         rtd.height = height;
-        rtd.depthBufferBits = 32;
+        rtd.depthBufferBits = 1;
         rtd.msaaSamples = 1;
         rtd.enableRandomWrite = true;
         cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Point);
@@ -50,7 +50,7 @@ class AlbedoGrabPass : ScriptableRenderPass
         // cmd.Blit(colorAttachment, albedoHandle.Identifier());
 
         ConfigureTarget(albedoHandle.Identifier());
-        ConfigureClear(ClearFlag.Color, Color.black);
+        ConfigureClear(ClearFlag.None, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)

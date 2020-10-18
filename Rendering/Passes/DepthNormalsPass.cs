@@ -46,14 +46,14 @@ class DepthNormalsPass : ScriptableRenderPass
 
         var depthDescriptor = cameraTextureDescriptor;
         depthDescriptor.colorFormat = RenderTextureFormat.ARGB32;
-        depthDescriptor.depthBufferBits = 32;
+        depthDescriptor.depthBufferBits = 1;
         depthDescriptor.msaaSamples = 1;
         depthDescriptor.width = width;
         depthDescriptor.height = height;
         cmd.GetTemporaryRT(depthHandle.id, depthDescriptor, FilterMode.Point);
 
         var depthTextureDescriptor = new RenderTextureDescriptor(width, height);
-        depthTextureDescriptor.depthBufferBits = 32;
+        depthTextureDescriptor.depthBufferBits = 0;
         depthTextureDescriptor.msaaSamples = 1;
         depthTextureDescriptor.colorFormat = RenderTextureFormat.Depth;
         cmd.GetTemporaryRT(depthTextureHandle.id, depthTextureDescriptor, FilterMode.Point);
@@ -62,7 +62,7 @@ class DepthNormalsPass : ScriptableRenderPass
         cmd.SetGlobalTexture(DEPTH_TEXTURE_ID, depthHandle.Identifier());
 
         ConfigureTarget(depthHandle.Identifier());
-        ConfigureClear(ClearFlag.All, Color.black);
+        ConfigureClear(ClearFlag.None, Color.black);
 
     }
 

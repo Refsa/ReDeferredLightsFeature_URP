@@ -33,6 +33,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
     CullLightsHandler cullLightsHandler;
 
+    GBufferPass gBufferPass;
+
     DebugPass debugPass;
     Material debugMaterial;
 
@@ -56,6 +58,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         lightsPass = new DeferredLightsPass(settings);
         tilesPass = new DeferredTilesPass(settings);
+
+        gBufferPass = new GBufferPass(settings);
 
         worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
@@ -89,10 +93,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
-        renderer.EnqueuePass(albedoGrabPass);
-        renderer.EnqueuePass(depthNormalsPass);
-        renderer.EnqueuePass(worldPositionPass);
-        renderer.EnqueuePass(specularGrabPass);
+        // renderer.EnqueuePass(albedoGrabPass);
+        // renderer.EnqueuePass(depthNormalsPass);
+        // renderer.EnqueuePass(worldPositionPass);
+        // renderer.EnqueuePass(specularGrabPass);
+
+        renderer.EnqueuePass(gBufferPass);
 
         renderer.EnqueuePass(tilesPass);
         renderer.EnqueuePass(lightsPass);

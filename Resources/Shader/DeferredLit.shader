@@ -58,7 +58,8 @@
         // Universal Pipeline tag is required. If Universal render pipeline is not set in the graphics settings
         // this Subshader will fail. One can add a subshader below or fallback to Standard built-in to make this
         // material work with both Universal Render Pipeline and Builtin Unity Pipeline
-        Tags{"RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True"}
+        Name "DeferredLit"
+        Tags{"RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" "LightMode" = "DeferredLit"}
         LOD 300
 
         // ------------------------------------------------------------------
@@ -288,16 +289,16 @@
                 return output;
             }
 
-            half4 frag(Varyings input) : SV_Target
+            float4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                half2 uv = input.uv;
-                half4 texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
-                half3 color = texColor.rgb * _BaseColor.rgb;
+                float2 uv = input.uv;
+                float4 texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
+                float3 color = texColor.rgb * _BaseColor.rgb;
                 
-                return half4(color, 1);
+                return float4(color, 1);
             }
             ENDHLSL
         }
@@ -319,7 +320,7 @@
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            half4 frag(Varyings input) : SV_Target
+            float4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -331,6 +332,92 @@
                 InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
             
                 return float4(brdfData.specular, brdfData.roughness);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "WorldPosition"
+            Tags {"LightMode" = "WorldPosition"}
+
+            Blend[_SrcBlend][_DstBlend]
+            ZWrite[_ZWrite]
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag 
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct appdata
+            {
+                float4 vertex : POSITION;
+            };
+
+            struct v2f
+            {
+                float4 vertex : SV_POSITION;
+                float3 worldPos : TEXCOORD0;
+            };
+
+            v2f vert (appdata v)
+            {
+                v2f o;
+
+                o.vertex = TransformObjectToHClip(v.vertex);
+                o.worldPos = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)).xyz;
+                
+                return o;
+            }
+
+            float4 frag (v2f i) : SV_Target
+            {
+                return float4(i.worldPos, 1.0);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthNormal"
+            Tags {"LightMode" = "DepthNormal"}
+
+            Blend[_SrcBlend][_DstBlend]
+            ZWrite[_ZWrite]
+            Cull[_Cull]
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag 
+
+            #include "UnityCG.cginc"
+
+            struct v2f
+            {
+                float4 vertex : SV_POSITION;
+                float4 nz : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            v2f vert (appdata_base v)
+            {
+                v2f o;
+
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.nz.xyz = COMPUTE_VIEW_NORMAL;
+                o.nz.w = COMPUTE_DEPTH_01;
+                
+                return o;
+            }
+
+            float4 frag (v2f i) : SV_Target
+            {
+                return EncodeDepthNormal(i.nz.w, i.nz.xyz);
             }
             ENDHLSL
         }

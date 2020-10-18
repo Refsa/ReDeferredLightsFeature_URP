@@ -40,6 +40,12 @@ public class MoveLightsInsideBox : MonoBehaviour
         if (velocities.IsCreated) velocities.Dispose();    
     }
 
+    void OnDisable() 
+    {
+        if (transformAccessArray.isCreated) transformAccessArray.Dispose();
+        if (velocities.IsCreated) velocities.Dispose();    
+    }
+
     void Update() 
     {
         if (lightTransforms == null) return;
