@@ -47,7 +47,7 @@ class SpecularGrabPass : ScriptableRenderPass
         cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
 
         ConfigureTarget(specularHandle.Identifier());
-        ConfigureClear(ClearFlag.None, Color.black);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -60,7 +60,10 @@ class SpecularGrabPass : ScriptableRenderPass
         {
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
             var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
+            // CoreUtils.SetRenderTarget(cmd, specularHandle.Identifier(), ClearFlag.None, Color.clear);
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, Specular_ID, specularHandle.Identifier());

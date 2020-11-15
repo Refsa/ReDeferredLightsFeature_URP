@@ -38,6 +38,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     DebugPass debugPass;
     Material debugMaterial;
 
+
     [SerializeField] Settings settings;
 
     bool error = false;
@@ -89,20 +90,23 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
             if (blitLightsMaterial == null) blitLightsMaterial = new Material(Shader.Find("Hidden/BlitLights"));
             lightsPass.SetMaterial(blitLightsMaterial);
-        }
+        } 
 
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
-        // renderer.EnqueuePass(albedoGrabPass);
-        // renderer.EnqueuePass(depthNormalsPass);
-        // renderer.EnqueuePass(worldPositionPass);
-        // renderer.EnqueuePass(specularGrabPass);
+        renderer.EnqueuePass(albedoGrabPass);
+        renderer.EnqueuePass(depthNormalsPass);
+        renderer.EnqueuePass(worldPositionPass);
+        renderer.EnqueuePass(specularGrabPass);
 
-        renderer.EnqueuePass(gBufferPass);
+        // renderer.EnqueuePass(gBufferPass);
 
         renderer.EnqueuePass(tilesPass);
+
+        lightsPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(lightsPass);
 
+        debugPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(debugPass);
     }
 

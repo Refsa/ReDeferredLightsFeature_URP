@@ -20,6 +20,8 @@ class DeferredLightsPass : ScriptableRenderPass
     Material _blitLightsMaterial;
     TextureDimension targetDimensions;
 
+    RenderTargetIdentifier colorTarget;
+
     public DeferredLightsPass(Settings settings)
     {
         renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
@@ -38,6 +40,11 @@ class DeferredLightsPass : ScriptableRenderPass
     public void SetMaterial(Material blitLightsMaterial)
     {
         _blitLightsMaterial = blitLightsMaterial;
+    }
+
+    public void Setup(RenderTargetIdentifier colorTarget)
+    {
+        this.colorTarget = colorTarget;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -64,6 +71,7 @@ class DeferredLightsPass : ScriptableRenderPass
             rtd.depthBufferBits = 0;
             rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(lightsHandle.id, rtd);
+            ComputeShaderUtils.Utils.DispatchClear(cmd, lightsHandle.Identifier(), size, size, Color.black);
         }
 
         // Full size RT
@@ -72,6 +80,7 @@ class DeferredLightsPass : ScriptableRenderPass
             rtd.enableRandomWrite = true;
             rtd.msaaSamples = 4;
             cmd.GetTemporaryRT(colorFullscreenHandle.id, rtd);
+            ComputeShaderUtils.Utils.DispatchClear(cmd, colorFullscreenHandle.Identifier(), width, height, Color.black);
         }
 
         // ### COMPUTE GLOBALS ###
@@ -158,26 +167,16 @@ class DeferredLightsPass : ScriptableRenderPass
             cmd.EndSample("DeferredLightsPass: Upsample Output");
         }
 
-        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CurrentActive;
+        cmd.SetGlobalTexture("_LightsTexture", colorFullscreenHandle.Identifier());
+
+        // RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
+        RenderTargetIdentifier cameraTarget = colorTarget;
         
-        // ### SCENE VIEW CAMERA ALSO IDENTIFIES AS "isDefaultViewport"
-        if (cameraData.isSceneViewCamera)
+        // if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera || cameraData.isStereoEnabled)
+        if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera || cameraData.isStereoEnabled)
         {
-            cmd.SetGlobalTexture("_LightsTexture", colorFullscreenHandle.Identifier());
-
-            // cmd.SetViewProjectionMatrices(Matrix4x4.identity, Matrix4x4.identity);
-            // cmd.SetViewport(cameraData.camera.pixelRect);
-            // cmd.DrawMesh(RenderingUtils.fullscreenMesh, Matrix4x4.identity, _blitLightsMaterial);
-            // cmd.SetViewProjectionMatrices(cameraData.camera.worldToCameraMatrix, cameraData.camera.projectionMatrix);
-        } 
-        // ### BLIT RESULTS BACK INTO RENDER BUFFER ###
-        else if (cameraData.isDefaultViewport)
-        {
-            cmd.SetRenderTarget(
-                cameraTarget,
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, // color
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
-
+            // cmd.SetRenderTarget(cameraTarget);
+            // cmd.ClearRenderTarget(false, true, Color.black, 1.0f);
             cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
         }
 

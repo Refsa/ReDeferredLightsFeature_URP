@@ -50,7 +50,7 @@ class AlbedoGrabPass : ScriptableRenderPass
         // cmd.Blit(colorAttachment, albedoHandle.Identifier());
 
         ConfigureTarget(albedoHandle.Identifier());
-        ConfigureClear(ClearFlag.None, Color.black);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -63,7 +63,10 @@ class AlbedoGrabPass : ScriptableRenderPass
         {
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
             var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
+            // CoreUtils.SetRenderTarget(cmd, albedoHandle.Identifier(), ClearFlag.None, Color.clear);
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());

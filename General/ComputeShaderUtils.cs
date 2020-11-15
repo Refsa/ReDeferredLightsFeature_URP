@@ -58,7 +58,7 @@ public static class ComputeShaderUtils
         {
             command.SetComputeTextureParam(UtilsCompute, UtilsComputeKernels.ClearTextureKernelID, "_TargetTexture", texture);
             command.SetComputeVectorParam(UtilsCompute, "_ClearColor", color);
-            command.DispatchCompute(UtilsCompute, UtilsComputeKernels.ClearTextureKernelID, width, height, 1);
+            command.DispatchCompute(UtilsCompute, UtilsComputeKernels.ClearTextureKernelID, width / 32, height / 32, 1);
         }
     }
 

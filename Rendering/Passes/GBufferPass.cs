@@ -30,7 +30,7 @@ class GBufferPass : ScriptableRenderPass
 
         renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
 
-        shaderTagId = new ShaderTagId("Refsa/Deferred Lit");
+        shaderTagId = new ShaderTagId("DeferredLit");
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
         shaderTagIds =
@@ -97,7 +97,7 @@ class GBufferPass : ScriptableRenderPass
         }
 
         ConfigureTarget(identifiers);
-        ConfigureClear(ClearFlag.Color, Color.white);
+        ConfigureClear(ClearFlag.Color, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -110,7 +110,7 @@ class GBufferPass : ScriptableRenderPass
         {
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
-            var drawSettings = CreateDrawingSettings(shaderTagIds.Reverse().ToList(), ref renderingData, sortFlags);
+            var drawSettings = CreateDrawingSettings(shaderTagIds.ToList(), ref renderingData, sortFlags);
 
             NativeArray<ShaderTagId> stds = new NativeArray<ShaderTagId>(shaderTagIds, Allocator.Temp);
             NativeArray<RenderStateBlock> rsbs = new NativeArray<RenderStateBlock>(renderStateBlocks, Allocator.Temp);

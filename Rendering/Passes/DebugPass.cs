@@ -10,6 +10,8 @@ class DebugPass : ScriptableRenderPass
     Settings _settings;
     Material _debugMaterial;
 
+    RenderTargetIdentifier colorTarget;
+
     static Texture2D heatmapTexture;
 
     public DebugPass(Settings settings, Material debugMaterial)
@@ -17,8 +19,15 @@ class DebugPass : ScriptableRenderPass
         _settings = settings;
         _debugMaterial = debugMaterial;
 
+        renderPassEvent = RenderPassEvent.AfterRendering;
+
         if (heatmapTexture is null)
             heatmapTexture = Resources.Load<Texture2D>("Textures/tdr_heatmap") as Texture2D;
+    }
+
+    public void Setup(RenderTargetIdentifier colorTarget)
+    {
+        this.colorTarget = colorTarget;
     }
 
     public void SetMaterial(Material debugMaterial)
@@ -37,7 +46,7 @@ class DebugPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        cmd.SetGlobalTexture(BackBufferImageID, BuiltinRenderTextureType.CurrentActive);
+        cmd.SetGlobalTexture(BackBufferImageID, colorTarget);
 
 #if UNITY_EDITOR
         cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
@@ -46,18 +55,18 @@ class DebugPass : ScriptableRenderPass
         cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
         ref CameraData cameraData = ref renderingData.cameraData;
 
-        Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;
-        debugMaterial?.SetMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
-
-        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : BuiltinRenderTextureType.CurrentActive;
+        // Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;
+        Material debugMaterial = _debugMaterial;
+        debugMaterial.SetMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
 
         if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera || cameraData.isStereoEnabled)
         {
             cmd.SetRenderTarget(
-                cameraTarget,
+                colorTarget,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
                 RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
-            cmd.Blit(cameraTarget, cameraTarget, debugMaterial);
+
+            cmd.Blit(null, colorTarget, debugMaterial);
         }
 
         context.ExecuteCommandBuffer(cmd);

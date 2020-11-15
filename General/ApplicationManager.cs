@@ -8,6 +8,6 @@ public class ApplicationManager
     public static void Setup()
     {
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = 244;
+        Application.targetFrameRate = 500;
     }
 }

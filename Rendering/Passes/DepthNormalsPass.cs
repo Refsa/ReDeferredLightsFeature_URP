@@ -53,7 +53,7 @@ class DepthNormalsPass : ScriptableRenderPass
         cmd.GetTemporaryRT(depthHandle.id, depthDescriptor, FilterMode.Point);
 
         var depthTextureDescriptor = new RenderTextureDescriptor(width, height);
-        depthTextureDescriptor.depthBufferBits = 0;
+        depthTextureDescriptor.depthBufferBits = 1;
         depthTextureDescriptor.msaaSamples = 1;
         depthTextureDescriptor.colorFormat = RenderTextureFormat.Depth;
         cmd.GetTemporaryRT(depthTextureHandle.id, depthTextureDescriptor, FilterMode.Point);
@@ -62,8 +62,7 @@ class DepthNormalsPass : ScriptableRenderPass
         cmd.SetGlobalTexture(DEPTH_TEXTURE_ID, depthHandle.Identifier());
 
         ConfigureTarget(depthHandle.Identifier());
-        ConfigureClear(ClearFlag.None, Color.black);
-
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -79,7 +78,10 @@ class DepthNormalsPass : ScriptableRenderPass
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
             drawSettings.perObjectData = PerObjectData.None; 
             drawSettings.overrideMaterial = _depthNormalsMaterial;
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
+            // CoreUtils.SetRenderTarget(cmd, depthHandle.Identifier(), ClearFlag.None, Color.clear);
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());

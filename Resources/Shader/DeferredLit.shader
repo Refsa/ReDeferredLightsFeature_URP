@@ -256,31 +256,23 @@
             #pragma vertex vert
             #pragma fragment frag
 
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/UnlitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 
             struct Attributes
             {
-                float4 positionOS       : POSITION;
-                float2 uv               : TEXCOORD0;
-                UNITY_VERTEX_INPUT_INSTANCE_ID
+                float4 positionOS : POSITION;
+                float2 uv         : TEXCOORD0;
             };
 
             struct Varyings
             {
-                float2 uv        : TEXCOORD0;
+                float2 uv     : TEXCOORD0;
                 float4 vertex : SV_POSITION;
-
-                UNITY_VERTEX_INPUT_INSTANCE_ID
-                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             Varyings vert(Attributes input)
             {
                 Varyings output = (Varyings)0;
-
-                UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_TRANSFER_INSTANCE_ID(input, output);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
                 output.vertex = vertexInput.positionCS;
@@ -291,14 +283,13 @@
 
             float4 frag(Varyings input) : SV_Target
             {
-                UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-
                 float2 uv = input.uv;
                 float4 texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
                 float3 color = texColor.rgb * _BaseColor.rgb;
-                
-                return float4(color, 1);
+
+                // clip(texColor.a > 0 ? 1 : -1);
+
+                return float4(color, texColor.a > 0 ? 1 : 0);
             }
             ENDHLSL
         }
@@ -349,7 +340,7 @@
             #pragma vertex vert
             #pragma fragment frag 
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 
             struct appdata
             {
@@ -366,7 +357,7 @@
             {
                 v2f o;
 
-                o.vertex = TransformObjectToHClip(v.vertex);
+                o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.worldPos = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)).xyz;
                 
                 return o;
@@ -392,27 +383,58 @@
             #pragma vertex vert
             #pragma fragment frag 
 
-            #include "UnityCG.cginc"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
 
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float3 normal : NORMAL;
+            };
             struct v2f
             {
                 float4 vertex : SV_POSITION;
                 float4 nz : TEXCOORD0;
-                UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            v2f vert (appdata_base v)
+            #define COMPUTE_DEPTH_01 -(TransformObjectToHClip( v.vertex.xyz ).z * _ProjectionParams.w)
+            #define COMPUTE_VIEW_NORMAL normalize(mul((float3x3)UNITY_MATRIX_IT_MV, v.normal))
+
+            v2f vert (appdata v)
             {
                 v2f o;
 
-                UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-
-                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.nz.xyz = COMPUTE_VIEW_NORMAL;
                 o.nz.w = COMPUTE_DEPTH_01;
                 
                 return o;
+            }
+            
+
+            inline float2 EncodeViewNormalStereo( float3 n )
+            {
+                float kScale = 1.7777;
+                float2 enc;
+                enc = n.xy / (n.z+1);
+                enc /= kScale;
+                enc = enc*0.5+0.5;
+                return enc;
+            }
+            inline float2 EncodeFloatRG( float v )
+            {
+                float2 kEncodeMul = float2(1.0, 255.0);
+                float kEncodeBit = 1.0/255.0;
+                float2 enc = kEncodeMul * v;
+                enc = frac (enc);
+                enc.x -= enc.y * kEncodeBit;
+                return enc;
+            }
+            inline float4 EncodeDepthNormal( float depth, float3 normal )
+            {
+                float4 enc;
+                enc.xy = EncodeViewNormalStereo (normal);
+                enc.zw = EncodeFloatRG (depth);
+                return enc;
             }
 
             float4 frag (v2f i) : SV_Target
@@ -422,6 +444,7 @@
             ENDHLSL
         }
     }
+
     FallBack "Hidden/Universal Render Pipeline/FallbackError"
     CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
 }

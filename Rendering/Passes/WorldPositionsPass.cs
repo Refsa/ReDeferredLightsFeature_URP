@@ -51,7 +51,7 @@ class WorldPositionPass : ScriptableRenderPass
         cmd.GetTemporaryRT(wpHandle.id, wpDescriptor, FilterMode.Point);
 
         ConfigureTarget(wpHandle.Identifier());
-        ConfigureClear(ClearFlag.None, Color.clear);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -67,7 +67,10 @@ class WorldPositionPass : ScriptableRenderPass
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
             drawSettings.perObjectData = PerObjectData.None;
             drawSettings.overrideMaterial = _worldPositionMaterial;
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
+            // CoreUtils.SetRenderTarget(cmd, wpHandle.Identifier(), ClearFlag.None, Color.clear);
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
