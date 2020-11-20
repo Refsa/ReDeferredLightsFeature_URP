@@ -43,7 +43,7 @@ public class TestBlitFeature : ScriptableRendererFeature
             // if (renderingData.cameraData.isSceneViewCamera)
             {
                 cmd.Blit(colorTarget, blitHandle.Identifier(), settings.Material);
-                cmd.Blit(blitHandle.Identifier(), colorTarget);
+                cmd.Blit(blitHandle.Identifier(), colorTarget); 
             }
 
             context.ExecuteCommandBuffer(cmd);
@@ -65,8 +65,6 @@ public class TestBlitFeature : ScriptableRendererFeature
         settings.Material = new Material(Shader.Find("Unlit/InverseColorShader"));
 
         m_ScriptablePass = new CustomRenderPass(settings);
-
-        m_ScriptablePass.renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)

@@ -107,14 +107,14 @@ void ComputeLights (
     }
 
     PixelData pd = (PixelData)0;
-    float alpha = 1.0;
 
     // Set pixel data
     {
+        float4 albedo = _AlbedoTexture[id.xy].rgba;
+        float alpha = albedo.a;
+
         float4 depthNormal = _DepthNormalsTexture[id.xy];
         float4 specular = _SpecularTexture[id.xy];
-        float4 albedo = _AlbedoTexture[id.xy].rgba;
-        alpha = albedo.a;
 
         float depth = DecodeFloatRG(depthNormal.zw);
         float3 normal = DecodeNormal(depthNormal);
@@ -136,11 +136,6 @@ void ComputeLights (
         pd.Roughness2 = roughness2;
         pd.Roughness2MinusOne = roughness2MinusOne;
         pd.NormalizationTerm = normalizationTerm;
-    }
-
-    [branch] if (alpha < 0.5) {
-        _DeferredLightsTexture[id.xy] = 0;
-        return;
     }
 
     float4 accLight = 0, col = 0;

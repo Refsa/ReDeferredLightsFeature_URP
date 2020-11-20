@@ -13,8 +13,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     {
         [Range(0.1f, 1f)] public float ResolutionMultiplier = 0.5f;
 
+        public bool DeferredPassOn = true;
+
         [Header("Debug")]
         public DebugMode DebugMode = DebugMode.None;
+        public bool DebugModeInSceneView;
+        public bool ShowInSceneView = true;
     }
 
     DeferredLightsPass lightsPass;

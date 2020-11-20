@@ -287,9 +287,9 @@
                 float4 texColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv);
                 float3 color = texColor.rgb * _BaseColor.rgb;
 
-                // clip(texColor.a > 0 ? 1 : -1);
+                clip(texColor.a > 0 ? 1 : -1);
 
-                return float4(color, texColor.a > 0 ? 1 : 0);
+                return float4(color, 1.0);
             }
             ENDHLSL
         }
@@ -313,11 +313,10 @@
 
             float4 frag(Varyings input) : SV_Target
             {
-                UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-            
                 SurfaceData surfaceData;
                 InitializeStandardLitSurfaceData(input.uv, surfaceData);
+
+                clip(surfaceData.alpha > 0 ? 1 : -1);
 
                 BRDFData brdfData;
                 InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
@@ -410,7 +409,6 @@
                 return o;
             }
             
-
             inline float2 EncodeViewNormalStereo( float3 n )
             {
                 float kScale = 1.7777;

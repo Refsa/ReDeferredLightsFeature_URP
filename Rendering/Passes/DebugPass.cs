@@ -5,12 +5,11 @@ using Settings = DeferredLightsFeature.Settings;
 
 class DebugPass : ScriptableRenderPass
 {
-    const string BackBufferImageID = "_BackBuffer_Image";
-
     Settings _settings;
     Material _debugMaterial;
 
     RenderTargetIdentifier colorTarget;
+    RenderTargetHandle tempHandle;
 
     static Texture2D heatmapTexture;
 
@@ -19,7 +18,9 @@ class DebugPass : ScriptableRenderPass
         _settings = settings;
         _debugMaterial = debugMaterial;
 
-        renderPassEvent = RenderPassEvent.AfterRendering;
+        renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
+
+        tempHandle.Init("_DebugPassTemp");
 
         if (heatmapTexture is null)
             heatmapTexture = Resources.Load<Texture2D>("Textures/tdr_heatmap") as Texture2D;
@@ -37,7 +38,7 @@ class DebugPass : ScriptableRenderPass
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+        cmd.GetTemporaryRT(tempHandle.id, cameraTextureDescriptor);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -46,27 +47,30 @@ class DebugPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        cmd.SetGlobalTexture(BackBufferImageID, colorTarget);
+        ref CameraData cameraData = ref renderingData.cameraData;
 
 #if UNITY_EDITOR
         cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
 #endif
 
-        cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
-        ref CameraData cameraData = ref renderingData.cameraData;
-
-        // Material debugMaterial = cameraData.isSceneViewCamera ? null : _debugMaterial;
-        Material debugMaterial = _debugMaterial;
-        debugMaterial.SetMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
-
-        if (cameraData.isDefaultViewport || cameraData.isSceneViewCamera || cameraData.isStereoEnabled)
+        if (_settings.DeferredPassOn)
         {
-            cmd.SetRenderTarget(
-                colorTarget,
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
+            cmd.SetGlobalMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
+            cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
 
-            cmd.Blit(null, colorTarget, debugMaterial);
+            Material debugMaterial = _debugMaterial;
+            RenderTargetIdentifier cameraTarget = colorTarget;
+
+            if (cameraData.isSceneViewCamera && _settings.DebugModeInSceneView)
+            {
+                cmd.Blit(cameraTarget, tempHandle.Identifier(), debugMaterial);
+                cmd.Blit(tempHandle.Identifier(), cameraTarget);
+            }
+            else if ((cameraData.isDefaultViewport || cameraData.isStereoEnabled) && !cameraData.isSceneViewCamera)
+            {
+                cmd.Blit(cameraTarget, tempHandle.Identifier(), debugMaterial);
+                cmd.Blit(tempHandle.Identifier(), cameraTarget);
+            }
         }
 
         context.ExecuteCommandBuffer(cmd);
@@ -75,6 +79,6 @@ class DebugPass : ScriptableRenderPass
 
     public override void FrameCleanup(CommandBuffer cmd)
     {
-
+        cmd.ReleaseTemporaryRT(tempHandle.id);
     }
 }
