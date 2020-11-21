@@ -24,7 +24,7 @@ class DeferredLightsPass : ScriptableRenderPass
 
     public DeferredLightsPass(Settings settings)
     {
-        renderPassEvent = RenderPassEvent.BeforeRenderingSkybox;
+        renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
 
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
