@@ -24,7 +24,7 @@ class DeferredLightsPass : ScriptableRenderPass
 
     public DeferredLightsPass(Settings settings)
     {
-        renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+        renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
 
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
@@ -143,7 +143,6 @@ class DeferredLightsPass : ScriptableRenderPass
 
         if (_settings.DeferredPassOn)
         {
-
             // ### SET CAMERA DATA ###
             {
                 Camera camera = cameraData.camera;
@@ -189,6 +188,10 @@ class DeferredLightsPass : ScriptableRenderPass
             {
                 cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
             }
+        }
+        else
+        {
+            cmd.Blit(colorAttachment, colorTarget);
         }
 
         cmd.EndSample("DeferredLightsPass: Execute");
