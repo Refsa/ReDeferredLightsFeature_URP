@@ -42,6 +42,9 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     DebugPass debugPass;
     Material debugMaterial;
 
+    BlitLightsPass blitLightsPass;
+    CopyColorPass copyColorPass;
+
 
     [SerializeField] Settings settings;
 
@@ -70,6 +73,9 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
         albedoGrabPass = new AlbedoGrabPass(settings);
         specularGrabPass = new SpecularGrabPass(settings);
+
+        blitLightsPass = new BlitLightsPass(settings);
+        copyColorPass = new CopyColorPass(settings);
 
         debugPass = new DebugPass(settings, debugMaterial);
     }
@@ -109,6 +115,12 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         lightsPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(lightsPass);
+
+        copyColorPass.Setup(renderer.cameraColorTarget);
+        renderer.EnqueuePass(copyColorPass);
+
+        blitLightsPass.Setup(renderer.cameraColorTarget, lightsPass.BlitHandle, blitLightsMaterial);
+        renderer.EnqueuePass(blitLightsPass);
 
         debugPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(debugPass);

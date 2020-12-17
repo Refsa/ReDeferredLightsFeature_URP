@@ -22,6 +22,9 @@ class DeferredLightsPass : ScriptableRenderPass
 
     RenderTargetIdentifier colorTarget;
 
+    public RenderTargetHandle BlitHandle => colorFullscreenHandle;
+    public RenderTargetHandle LightsHandle => lightsHandle;
+
     public DeferredLightsPass(Settings settings)
     {
         renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
@@ -175,19 +178,19 @@ class DeferredLightsPass : ScriptableRenderPass
                 cmd.EndSample("DeferredLightsPass: Upsample Output");
             }
 
-            cmd.SetGlobalTexture("_LightsTexture", colorFullscreenHandle.Identifier());
+            cmd.SetGlobalTexture("_LightsTexture", lightsHandle.Identifier());
 
             // RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
-            RenderTargetIdentifier cameraTarget = colorTarget;
+            // RenderTargetIdentifier cameraTarget = colorTarget;
 
-            if (cameraData.isSceneViewCamera && _settings.ShowInSceneView)
-            {
-                cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
-            }
-            else if ((cameraData.isDefaultViewport || cameraData.isStereoEnabled) && !cameraData.isSceneViewCamera)
-            {
-                cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
-            }
+            // if (cameraData.isSceneViewCamera && _settings.ShowInSceneView)
+            // {
+            //     cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
+            // }
+            // else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
+            // {
+            //     cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
+            // }
         }
         else
         {

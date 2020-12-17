@@ -59,18 +59,21 @@ class AlbedoGrabPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Albedo")))
+        if (_settings.DeferredPassOn)
         {
-            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-            var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
-            drawSettings.enableDynamicBatching = true;
-            drawSettings.enableInstancing = true;
+            using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Albedo")))
+            {
+                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+                var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
+                drawSettings.enableDynamicBatching = true;
+                drawSettings.enableInstancing = true;
 
-            // CoreUtils.SetRenderTarget(cmd, albedoHandle.Identifier(), ClearFlag.None, Color.clear);
-            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
+                // CoreUtils.SetRenderTarget(cmd, albedoHandle.Identifier(), ClearFlag.None, Color.clear);
+                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
-            cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
+                cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
+                cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
+            }
         }
 
         context.ExecuteCommandBuffer(cmd);
