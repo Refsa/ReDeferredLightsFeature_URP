@@ -27,7 +27,7 @@ class DeferredLightsPass : ScriptableRenderPass
 
     public DeferredLightsPass(Settings settings)
     {
-        renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
+        renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
 
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
@@ -143,6 +143,7 @@ class DeferredLightsPass : ScriptableRenderPass
         cmd.BeginSample("DeferredLightsPass: Execute");
 
         ref CameraData cameraData = ref renderingData.cameraData;
+        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
 
         if (_settings.DeferredPassOn)
         {
@@ -180,21 +181,18 @@ class DeferredLightsPass : ScriptableRenderPass
 
             cmd.SetGlobalTexture("_LightsTexture", lightsHandle.Identifier());
 
-            // RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
-            // RenderTargetIdentifier cameraTarget = colorTarget;
-
-            // if (cameraData.isSceneViewCamera && _settings.ShowInSceneView)
-            // {
-            //     cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
-            // }
-            // else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
-            // {
-            //     cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
-            // }
+            if (cameraData.isSceneViewCamera && _settings.ShowInSceneView)
+            {
+                cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
+            }
+            else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
+            {
+                cmd.Blit(colorFullscreenHandle.Identifier(), cameraTarget);
+            }
         }
         else
         {
-            cmd.Blit(colorAttachment, colorTarget);
+            cmd.Blit(colorAttachment, cameraTarget);
         }
 
         cmd.EndSample("DeferredLightsPass: Execute");

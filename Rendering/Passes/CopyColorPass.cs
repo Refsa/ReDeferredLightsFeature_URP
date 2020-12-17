@@ -15,7 +15,7 @@ class CopyColorPass : ScriptableRenderPass
     public CopyColorPass(Settings settings)
     {
         _settings = settings;
-        renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+        renderPassEvent = RenderPassEvent.AfterRenderingSkybox;
         colorTempHandle.Init("_CopyColorTemp");
         depthTempHandle.Init("_CopyDepthHandle");
     }

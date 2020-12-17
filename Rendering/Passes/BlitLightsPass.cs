@@ -17,7 +17,7 @@ class BlitLightsPass : ScriptableRenderPass
     public BlitLightsPass(Settings settings)
     {
         _settings = settings;
-        renderPassEvent = RenderPassEvent.AfterRenderingOpaques;
+        renderPassEvent = RenderPassEvent.AfterRenderingTransparents;
         tempHandle.Init("_BlitLightTemp");
     }
 

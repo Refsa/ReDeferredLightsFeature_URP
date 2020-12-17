@@ -84,7 +84,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     {
         if (error)
         {
-            return; 
+            return;
         }
 
         // Reinit materials if they are lost in unity internal state change
@@ -100,16 +100,19 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
             if (blitLightsMaterial == null) blitLightsMaterial = new Material(Shader.Find("Hidden/BlitLights"));
             lightsPass.SetMaterial(blitLightsMaterial);
-        } 
+        }
 
         cullLightsHandler.CullLights(renderingData.cameraData.camera);
 
-        renderer.EnqueuePass(albedoGrabPass);
-        renderer.EnqueuePass(depthNormalsPass);
-        renderer.EnqueuePass(worldPositionPass);
-        renderer.EnqueuePass(specularGrabPass);
+        // GBuffer
+        {
+            renderer.EnqueuePass(albedoGrabPass);
+            renderer.EnqueuePass(depthNormalsPass);
+            renderer.EnqueuePass(worldPositionPass);
+            renderer.EnqueuePass(specularGrabPass);
 
-        // renderer.EnqueuePass(gBufferPass);
+            // renderer.EnqueuePass(gBufferPass);
+        }
 
         renderer.EnqueuePass(tilesPass);
 
