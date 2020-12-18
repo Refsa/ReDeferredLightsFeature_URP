@@ -10,7 +10,7 @@ class CopyColorPass : ScriptableRenderPass
     RenderTargetIdentifier colorTarget;
     RenderTargetHandle colorTempHandle;
     RenderTargetHandle depthTempHandle;
-    
+
 
     public CopyColorPass(Settings settings)
     {
@@ -50,8 +50,9 @@ class CopyColorPass : ScriptableRenderPass
 
         cmd.Blit(depthAttachment, depthTempHandle.Identifier());
         cmd.SetGlobalTexture("_DepthTexture_AfterOpaques", depthTempHandle.Identifier());
-        
-        // cmd.Blit(colorAttachment, colorTarget);
+
+        // RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
+        // cmd.Blit(colorAttachment, cameraTarget);
 
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

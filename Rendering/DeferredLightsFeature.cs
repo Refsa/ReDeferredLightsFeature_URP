@@ -119,11 +119,11 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         lightsPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(lightsPass);
 
-        copyColorPass.Setup(renderer.cameraColorTarget);
-        renderer.EnqueuePass(copyColorPass);
+        // copyColorPass.Setup(renderer.cameraColorTarget);
+        // renderer.EnqueuePass(copyColorPass);
 
-        blitLightsPass.Setup(renderer.cameraColorTarget, lightsPass.BlitHandle, blitLightsMaterial);
-        renderer.EnqueuePass(blitLightsPass);
+        // blitLightsPass.Setup(renderer.cameraColorTarget, blitLightsMaterial);
+        // renderer.EnqueuePass(blitLightsPass);
 
         debugPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(debugPass);

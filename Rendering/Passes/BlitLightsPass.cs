@@ -7,7 +7,6 @@ class BlitLightsPass : ScriptableRenderPass
 {
     Settings _settings;
 
-    RenderTargetHandle blitHandle;
     RenderTargetIdentifier colorTarget;
 
     RenderTargetHandle tempHandle;
@@ -21,10 +20,9 @@ class BlitLightsPass : ScriptableRenderPass
         tempHandle.Init("_BlitLightTemp");
     }
 
-    public void Setup(RenderTargetIdentifier colorTarget, RenderTargetHandle blitHandle, Material blitLightsMaterial)
+    public void Setup(RenderTargetIdentifier colorTarget, Material blitLightsMaterial)
     {
         this.colorTarget = colorTarget;
-        this.blitHandle = blitHandle;
         this.blitLightsMaterial = blitLightsMaterial;
     }
 
@@ -40,24 +38,27 @@ class BlitLightsPass : ScriptableRenderPass
         cmd.Clear();
 
         ref CameraData cameraData = ref renderingData.cameraData;
+        RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
 
         if (_settings.DeferredPassOn)
         {
-            RenderTargetIdentifier cameraTarget = colorTarget;
-
             if (cameraData.isSceneViewCamera)
             {
                 if (_settings.ShowInSceneView)
                 {
                     cmd.Blit(colorAttachment, tempHandle.Identifier(), blitLightsMaterial);
-                    cmd.Blit(tempHandle.Identifier(), colorTarget);
+                    cmd.Blit(tempHandle.Identifier(), cameraTarget);
                 }
             }
             else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
             {
                 cmd.Blit(colorAttachment, tempHandle.Identifier(), blitLightsMaterial);
-                cmd.Blit(tempHandle.Identifier(), colorTarget);
+                cmd.Blit(tempHandle.Identifier(), cameraTarget);
             }
+        }
+        else
+        {
+            cmd.Blit(colorAttachment, cameraTarget);
         }
 
         context.ExecuteCommandBuffer(cmd);

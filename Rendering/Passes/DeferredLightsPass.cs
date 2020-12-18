@@ -145,7 +145,7 @@ class DeferredLightsPass : ScriptableRenderPass
         ref CameraData cameraData = ref renderingData.cameraData;
         RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
 
-        if (_settings.DeferredPassOn)
+        if (_settings.DeferredPassOn && !cameraData.isSceneViewCamera)
         {
             // ### SET CAMERA DATA ###
             {
