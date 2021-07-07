@@ -23,30 +23,26 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         public bool ShowInSceneView = true;
     }
 
+#region Deferred Lights Passes
     DeferredLightsPass lightsPass;
-    Material blitLightsMaterial;
     DeferredTilesPass tilesPass;
-
-    DepthNormalsPass depthNormalsPass;
-    Material depthNormalsMaterial;
-
-    WorldPositionPass worldPositionPass;
-    Material worldPositionMaterial;
-
-    AlbedoGrabPass albedoGrabPass;
-
-    SpecularGrabPass specularGrabPass;
-
     CullLightsHandler cullLightsHandler;
+    Material blitLightsMaterial;
+#endregion
+
+#region Multi-Pass GBuffer
+    DepthNormalsPass depthNormalsPass;
+    WorldPositionPass worldPositionPass;
+    AlbedoGrabPass albedoGrabPass;
+    SpecularGrabPass specularGrabPass;
+    Material depthNormalsMaterial;
+    Material worldPositionMaterial;
+#endregion
 
     GBufferPass gBufferPass;
 
     DebugPass debugPass;
     Material debugMaterial;
-
-    BlitLightsPass blitLightsPass;
-    CopyColorPass copyColorPass;
-
 
     [SerializeField] Settings settings;
 
@@ -75,9 +71,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
         albedoGrabPass = new AlbedoGrabPass(settings);
         specularGrabPass = new SpecularGrabPass(settings);
-
-        blitLightsPass = new BlitLightsPass(settings);
-        copyColorPass = new CopyColorPass(settings);
 
         debugPass = new DebugPass(settings, debugMaterial);
     }
@@ -126,12 +119,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         lightsPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(lightsPass);
-
-        // copyColorPass.Setup(renderer.cameraColorTarget);
-        // renderer.EnqueuePass(copyColorPass);
-
-        // blitLightsPass.Setup(renderer.cameraColorTarget, blitLightsMaterial);
-        // renderer.EnqueuePass(blitLightsPass);
 
         debugPass.Setup(renderer.cameraColorTarget);
         renderer.EnqueuePass(debugPass);
