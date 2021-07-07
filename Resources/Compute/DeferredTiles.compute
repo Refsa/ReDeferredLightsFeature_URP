@@ -17,7 +17,6 @@ RWTexture2D<uint2> _TileData;
 
 Texture2D<float4> _DepthNormalsTexture;
 Texture2D<float4> _WorldPositionsTexture;
-Texture2D _DepthTexture;
 
 // #########################
 // ### COMPUTE TILE DATA ###
@@ -50,7 +49,6 @@ void ComputeLightTiles(
 {
     uint i = 0;
     int2 texCoord = id.xy;
-    // float depth = _DepthTexture.Load(uint3(texCoord, 0)).r;
     float2 dnenc = _DepthNormalsTexture.Load(uint3(texCoord, 0)).zw;
     float depth = DecodeFloatRG(dnenc);
     
@@ -77,7 +75,7 @@ void ComputeLightTiles(
     float minDepth = asfloat(MinDepth);
     float maxDepth = asfloat(MaxDepth);
 
-    float minDepthVS = NDCToView(float4(0, 0, minDepth, minDepth)).z;
+    float minDepthVS = NDCToView(float4(0, 0, minDepth, _ProjParams.y)).z;
     float maxDepthVS = NDCToView(float4(0, 0, maxDepth, _ProjParams.z)).z;
 
     for (i = groupIndex; i < _LightCount; i += BLOCK_SIZE * BLOCK_SIZE)
