@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class DeferredLightsData : MonoBehaviour
 {
@@ -26,7 +27,10 @@ public class DeferredLightsData : MonoBehaviour
             float lightRangeSqrOverFadeRangeSqr = -lightRangeSqr / fadeRangeSqr;
             float oneOverLightRangeSqr = 1.0f / Mathf.Max(0.0001f, lightRangeSqr);
 
-            return new Vector2(oneOverLightRangeSqr, lightRangeSqrOverFadeRangeSqr);
+            return new Vector2(
+                Application.isMobilePlatform || SystemInfo.graphicsDeviceType == GraphicsDeviceType.Switch ? oneOverFadeRangeSqr : oneOverLightRangeSqr, 
+                lightRangeSqrOverFadeRangeSqr
+            );
         }
     }
 
