@@ -119,7 +119,7 @@ public class DeferredTilesPass : ScriptableRenderPass
         }
 
         // ### COMPUTE FRUSTUMS ###
-        // if (refreshTiles)
+        if (refreshTiles)
         {
             var frustumDataBuffer = ShaderData.instance.GetFrustumDataBuffer(MAX_TILES);
             cmd.SetComputeBufferParam(tilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeTileFrustumKernelID, FRUSTUM_DATA_ID, frustumDataBuffer);
