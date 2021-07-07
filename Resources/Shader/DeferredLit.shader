@@ -402,7 +402,7 @@
                 v2f o;
 
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
-                o.nz.xyz = COMPUTE_VIEW_NORMAL;
+                o.nz.xyz = mul((float3x3)unity_ObjectToWorld, v.normal);
                 o.nz.w = -(o.vertex.z * _ProjectionParams.w);
                 
                 return o;
@@ -454,29 +454,17 @@
             AlphaToMask On
 
             HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-
-            #pragma target 3.5
+            #define REQUIRES_WORLD_SPACE_POS_INTERPOLATOR
+            #define _NORMALMAP
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct R_Attributes
-            {
-                float4 positionOS : POSITION;
-                float2 uv         : TEXCOORD0;
-                float3 normal     : NORMAL;
-            };
+            #pragma vertex LitPassVertex
+            #pragma fragment frag
 
-            struct R_Varyings
-            {
-                float4 vertex    : SV_POSITION;
-                float2 uv        : TEXCOORD0;
-                float3 world_pos : TEXCOORD1;
-                float4 nz_enc    : TEXCOORD2;
-            };
+            #pragma target 3.5
 
             struct Output
             {
@@ -486,40 +474,24 @@
                 float4 depth_normal   : SV_TARGET3;
             };
 
-            R_Varyings vert(R_Attributes input)
+            Output frag(Varyings input)
             {
-                R_Varyings output = (R_Varyings)0;
-
-                VertexPositionInputs vertex_input = GetVertexPositionInputs(input.positionOS.xyz);
-                output.vertex = vertex_input.positionCS;
-                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
-                output.world_pos = mul(unity_ObjectToWorld, float4(input.positionOS.xyz, 1.0)).xyz;
-
-                output.nz_enc.xyz = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, input.normal));
-                // output.nz_enc.w = -(vertex_input.positionCS.z * _ProjectionParams.w);
-                output.nz_enc.w = vertex_input.positionCS.z;
-
-                return output;
-            }
-
-            Output frag(R_Varyings input)
-            {
-                float4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
-                albedo.rgb *= _BaseColor.rgb;
-
                 SurfaceData surface_data;
                 InitializeStandardLitSurfaceData(input.uv, surface_data);
                 clip(surface_data.alpha >= 0 ? 1 : -1);
+
+                InputData inputData;
+                InitializeInputData(input, surface_data.normalTS, inputData);
 
                 BRDFData brdf_data;
                 InitializeBRDFData(surface_data.albedo, surface_data.metallic, surface_data.specular, surface_data.smoothness, surface_data.alpha, brdf_data);
 
                 Output output = (Output)0;
 
-                output.albedo         = float4(albedo.rgb, surface_data.alpha);
+                output.albedo         = float4(surface_data.albedo, surface_data.alpha);
                 output.specular       = float4(brdf_data.specular, brdf_data.roughness);
-                output.world_position = input.world_pos;
-                output.depth_normal   = EncodeDepthNormal(input.nz_enc.w, input.nz_enc.xyz);
+                output.world_position = input.positionWS;
+                output.depth_normal   = EncodeDepthNormal(input.positionCS.z, inputData.normalWS);
 
                 return output;
             }
@@ -528,5 +500,4 @@
     }
 
     FallBack "Hidden/Universal Render Pipeline/FallbackError"
-    CustomEditor "UnityEditor.Rendering.Universal.ShaderGUI.LitShader"
 }
