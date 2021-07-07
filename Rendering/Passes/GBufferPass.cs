@@ -1,5 +1,6 @@
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
@@ -9,16 +10,12 @@ public class GBufferPass : ScriptableRenderPass
     const string SPECULAR_HANDLE_ID = "_SpecularTexture";
     const string WORLD_POSITION_HANDLE_ID = "_WorldPositionsTexture";
     const string DEPTH_NORMAL_HANDLE_ID = "_DepthNormalsTexture";
-    const string DEPTH_TEXTURE_ID = "_DepthTexture";
 
     const string ALBEDO_ID = "_AlbedoTexture";
     const string SPECULAR_ID = "_SpecularTexture";
     const string WORLD_POSITIONS_ID = "_WorldPositionsTexture";
     const string DEPTH_NORMAL_ID = "_DepthNormalsTexture";
 
-    static readonly ShaderTagId shaderTagLit = new ShaderTagId("Lit");
-    static readonly ShaderTagId shaderTagSimpleLit = new ShaderTagId("SimpleLit");
-    static readonly ShaderTagId shaderTagUnlit = new ShaderTagId("Unlit");
     static readonly ShaderTagId gBufferShaderTag = new ShaderTagId("R_GBuffer");
 
     readonly RenderTargetHandle albedoHandle;
@@ -66,7 +63,7 @@ public class GBufferPass : ScriptableRenderPass
         // ALBEDO
         {
             var rtd = cameraTextureDescriptor;
-            rtd.colorFormat = RenderTextureFormat.ARGB32;
+            rtd.graphicsFormat = QualitySettings.activeColorSpace == ColorSpace.Linear ? GraphicsFormat.R8G8B8A8_SRGB : GraphicsFormat.R8G8B8A8_UNorm;
             rtd.width = width;
             rtd.height = height;
             rtd.depthBufferBits = 0;
@@ -79,7 +76,7 @@ public class GBufferPass : ScriptableRenderPass
         // SPECULAR
         {
             var rtd = cameraTextureDescriptor;
-            rtd.colorFormat = RenderTextureFormat.ARGB32;
+            rtd.graphicsFormat = GraphicsFormat.R8G8B8A8_UNorm;
             rtd.width = width;
             rtd.height = height;
             rtd.depthBufferBits = 0;
@@ -92,7 +89,7 @@ public class GBufferPass : ScriptableRenderPass
         // WORLD_POS
         {
             var rtd = cameraTextureDescriptor;
-            rtd.colorFormat = RenderTextureFormat.ARGBFloat;
+            rtd.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
             rtd.depthBufferBits = 0;
             rtd.msaaSamples = 1;
             rtd.width = width;
@@ -106,7 +103,7 @@ public class GBufferPass : ScriptableRenderPass
         // DEPTH_NORMAL
         {
             var rtd = cameraTextureDescriptor;
-            rtd.colorFormat = RenderTextureFormat.ARGB32;
+            rtd.graphicsFormat = GraphicsFormat.R8G8B8A8_UNorm;
             rtd.depthBufferBits = 0;
             rtd.msaaSamples = 1;
             rtd.width = width;
