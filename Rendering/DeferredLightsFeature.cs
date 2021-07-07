@@ -69,7 +69,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         lightsPass = new DeferredLightsPass(settings);
         tilesPass = new DeferredTilesPass(settings);
 
-        gBufferPass = new GBufferPass();
+        gBufferPass = new GBufferPass(settings);
 
         worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);

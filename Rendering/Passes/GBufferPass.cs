@@ -31,13 +31,17 @@ public class GBufferPass : ScriptableRenderPass
 
     RenderTargetIdentifier colorTarget;
 
+    DeferredLightsFeature.Settings _settings;
+
     public ref readonly RenderTargetHandle AlbedoHandle => ref albedoHandle;
     public ref readonly RenderTargetHandle SpecularHandle => ref specularHandle;
     public ref readonly RenderTargetHandle WorldPosHandle => ref worldPosHandle;
     public ref readonly RenderTargetHandle DepthNormalHandle => ref depthNormalHandle;
 
-    public GBufferPass()
+    public GBufferPass(DeferredLightsFeature.Settings settings)
     {
+        _settings = settings;
+
         renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
 
         filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
@@ -56,8 +60,8 @@ public class GBufferPass : ScriptableRenderPass
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
-        int width = cameraTextureDescriptor.width;
-        int height = cameraTextureDescriptor.height;
+        int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
+        int height = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
 
         // ALBEDO
         {
@@ -67,7 +71,7 @@ public class GBufferPass : ScriptableRenderPass
             rtd.height = height;
             rtd.depthBufferBits = 0;
             rtd.msaaSamples = 1;
-            cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Point);
+            cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Bilinear);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
         }
@@ -80,7 +84,7 @@ public class GBufferPass : ScriptableRenderPass
             rtd.height = height;
             rtd.depthBufferBits = 0;
             rtd.msaaSamples = 1;
-            cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
+            cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Bilinear);
             
             cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, SPECULAR_ID, specularHandle.Identifier());
         }
@@ -93,7 +97,7 @@ public class GBufferPass : ScriptableRenderPass
             rtd.msaaSamples = 1;
             rtd.width = width;
             rtd.height = height;
-            cmd.GetTemporaryRT(worldPosHandle.id, rtd, FilterMode.Point);
+            cmd.GetTemporaryRT(worldPosHandle.id, rtd, FilterMode.Bilinear);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, WORLD_POSITIONS_ID, worldPosHandle.Identifier());
             cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, WORLD_POSITIONS_ID, worldPosHandle.Identifier());
@@ -103,11 +107,11 @@ public class GBufferPass : ScriptableRenderPass
         {
             var rtd = cameraTextureDescriptor;
             rtd.colorFormat = RenderTextureFormat.ARGB32;
-            rtd.depthBufferBits = 24;
+            rtd.depthBufferBits = 0;
             rtd.msaaSamples = 1;
             rtd.width = width;
             rtd.height = height;
-            cmd.GetTemporaryRT(depthNormalHandle.id, rtd, FilterMode.Point);
+            cmd.GetTemporaryRT(depthNormalHandle.id, rtd, FilterMode.Bilinear);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, DEPTH_NORMAL_ID, depthNormalHandle.Identifier());
             cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthNormalHandle.Identifier());
