@@ -60,25 +60,22 @@ class WorldPositionPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        if (_settings.DeferredPassOn)
+        using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: WorldPositionPass Render")))
         {
-            using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: WorldPositionPass Render")))
-            {
-                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
-                var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-                drawSettings.perObjectData = PerObjectData.None;
-                drawSettings.overrideMaterial = _worldPositionMaterial;
-                drawSettings.enableDynamicBatching = true;
-                drawSettings.enableInstancing = true;
+            var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
+            drawSettings.perObjectData = PerObjectData.None;
+            drawSettings.overrideMaterial = _worldPositionMaterial;
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
-                // CoreUtils.SetRenderTarget(cmd, wpHandle.Identifier(), ClearFlag.None, Color.clear);
-                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
+            // CoreUtils.SetRenderTarget(cmd, wpHandle.Identifier(), ClearFlag.None, Color.clear);
+            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
-                cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
-                cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
-                cmd.SetGlobalTexture("_DeferredPass_WorldPosition_Texture", wpHandle.Identifier());
-            }
+            cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, WORLD_POSITIONS_ID, wpHandle.Identifier());
+            cmd.SetGlobalTexture("_DeferredPass_WorldPosition_Texture", wpHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);

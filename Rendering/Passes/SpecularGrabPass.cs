@@ -56,21 +56,18 @@ class SpecularGrabPass : ScriptableRenderPass
         context.ExecuteCommandBuffer(cmd);
         cmd.Clear();
 
-        if (_settings.DeferredPassOn)
+        using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Specular")))
         {
-            using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: Grab Specular")))
-            {
-                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
-                var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
-                drawSettings.enableDynamicBatching = true;
-                drawSettings.enableInstancing = true;
+            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+            var drawSettings = CreateDrawingSettings(ShaderTagMeta, ref renderingData, sortFlags);
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
-                // CoreUtils.SetRenderTarget(cmd, specularHandle.Identifier(), ClearFlag.None, Color.clear);
-                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
+            // CoreUtils.SetRenderTarget(cmd, specularHandle.Identifier(), ClearFlag.None, Color.clear);
+            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
-                cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, Specular_ID, specularHandle.Identifier());
-                cmd.SetGlobalTexture("_DeferredPass_Specular_Texture", specularHandle.Identifier());
-            }
+            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, Specular_ID, specularHandle.Identifier());
+            cmd.SetGlobalTexture("_DeferredPass_Specular_Texture", specularHandle.Identifier());
         }
 
         context.ExecuteCommandBuffer(cmd);

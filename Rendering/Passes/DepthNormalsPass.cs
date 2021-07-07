@@ -73,19 +73,16 @@ class DepthNormalsPass : ScriptableRenderPass
 
         using (new ProfilingScope(cmd, new ProfilingSampler("DeferredLightsPass: DepthNormalsPass")))
         {
-            if (_settings.DeferredPassOn)
-            {
-                var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
+            var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
-                var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-                drawSettings.perObjectData = PerObjectData.None;
-                drawSettings.overrideMaterial = _depthNormalsMaterial;
-                drawSettings.enableDynamicBatching = true;
-                drawSettings.enableInstancing = true;
+            var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
+            drawSettings.perObjectData = PerObjectData.None;
+            drawSettings.overrideMaterial = _depthNormalsMaterial;
+            drawSettings.enableDynamicBatching = true;
+            drawSettings.enableInstancing = true;
 
-                // CoreUtils.SetRenderTarget(cmd, depthHandle.Identifier(), ClearFlag.None, Color.clear);
-                context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
-            }
+            // CoreUtils.SetRenderTarget(cmd, depthHandle.Identifier(), ClearFlag.None, Color.clear);
+            context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings);
 
             cmd.SetComputeTextureParam(ComputeShaderUtils.TilesCompute, ComputeShaderUtils.TilesComputeKernels.ComputeLightTilesKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
             cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());

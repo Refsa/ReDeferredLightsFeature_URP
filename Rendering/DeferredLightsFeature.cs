@@ -14,6 +14,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         [Range(0.1f, 1f)] public float ResolutionMultiplier = 0.5f;
 
         public bool DeferredPassOn = true;
+        [Tooltip("Multiple Render Targets - More optimized GBuffer pass but support for fewer platforms:\nDX11+, OpenGL 3.2+, OpenGL ES 3+, Metal, Vulkan, PS4/XB1")]
+        public bool UseMRT = true;
 
         [Header("Debug")]
         public DebugMode DebugMode = DebugMode.None;
@@ -67,7 +69,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         lightsPass = new DeferredLightsPass(settings);
         tilesPass = new DeferredTilesPass(settings);
 
-        gBufferPass = new GBufferPass(settings);
+        gBufferPass = new GBufferPass();
 
         worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
         depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
@@ -82,7 +84,7 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
-        if (error)
+        if (error || !settings.DeferredPassOn)
         {
             return;
         }
@@ -106,12 +108,18 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         // GBuffer
         {
-            renderer.EnqueuePass(albedoGrabPass);
-            renderer.EnqueuePass(depthNormalsPass);
-            renderer.EnqueuePass(worldPositionPass);
-            renderer.EnqueuePass(specularGrabPass);
-
-            // renderer.EnqueuePass(gBufferPass);
+            if (settings.UseMRT)
+            {
+                gBufferPass.Setup(renderer.cameraColorTarget);
+                renderer.EnqueuePass(gBufferPass);
+            }
+            else
+            {
+                renderer.EnqueuePass(albedoGrabPass);
+                renderer.EnqueuePass(depthNormalsPass);
+                renderer.EnqueuePass(worldPositionPass);
+                renderer.EnqueuePass(specularGrabPass);
+            }
         }
 
         renderer.EnqueuePass(tilesPass);

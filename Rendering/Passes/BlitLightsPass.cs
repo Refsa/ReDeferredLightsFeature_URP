@@ -40,25 +40,18 @@ class BlitLightsPass : ScriptableRenderPass
         ref CameraData cameraData = ref renderingData.cameraData;
         RenderTargetIdentifier cameraTarget = (cameraData.targetTexture != null) ? new RenderTargetIdentifier(cameraData.targetTexture) : colorTarget;
 
-        if (_settings.DeferredPassOn)
+        if (cameraData.isSceneViewCamera)
         {
-            if (cameraData.isSceneViewCamera)
-            {
-                if (_settings.ShowInSceneView)
-                {
-                    cmd.Blit(colorAttachment, tempHandle.Identifier(), blitLightsMaterial);
-                    cmd.Blit(tempHandle.Identifier(), cameraTarget);
-                }
-            }
-            else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
+            if (_settings.ShowInSceneView)
             {
                 cmd.Blit(colorAttachment, tempHandle.Identifier(), blitLightsMaterial);
                 cmd.Blit(tempHandle.Identifier(), cameraTarget);
             }
         }
-        else
+        else if (cameraData.isDefaultViewport || cameraData.isStereoEnabled)
         {
-            cmd.Blit(colorAttachment, cameraTarget);
+            cmd.Blit(colorAttachment, tempHandle.Identifier(), blitLightsMaterial);
+            cmd.Blit(tempHandle.Identifier(), cameraTarget);
         }
 
         context.ExecuteCommandBuffer(cmd);
