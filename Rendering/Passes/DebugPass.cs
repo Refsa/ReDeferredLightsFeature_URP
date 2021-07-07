@@ -49,12 +49,13 @@ class DebugPass : ScriptableRenderPass
 
         ref CameraData cameraData = ref renderingData.cameraData;
 
-        if (_settings.DebugMode != DeferredLightsFeature.DebugMode.None)
-        {
 #if UNITY_EDITOR
-            cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
+        cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
 #endif
+        var debugMode = (DeferredLightsFeature.DebugMode)Shader.GetGlobalInt("_DebugMode");
 
+        if (debugMode != DeferredLightsFeature.DebugMode.None)
+        {
             cmd.SetGlobalMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
             cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
 
