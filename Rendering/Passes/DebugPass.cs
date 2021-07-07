@@ -49,27 +49,26 @@ class DebugPass : ScriptableRenderPass
 
         ref CameraData cameraData = ref renderingData.cameraData;
 
+        if (_settings.DebugMode != DeferredLightsFeature.DebugMode.None)
+        {
 #if UNITY_EDITOR
-        cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
+            cmd.SetGlobalInt("_DebugMode", (int)_settings.DebugMode);
 #endif
 
-        if (_settings.DeferredPassOn)
-        {
             cmd.SetGlobalMatrix("MATRIX_IV", cameraData.camera.cameraToWorldMatrix);
             cmd.SetGlobalTexture("_HeatmapTexture", heatmapTexture);
 
             Material debugMaterial = _debugMaterial;
-            RenderTargetIdentifier cameraTarget = colorTarget;
 
             if (cameraData.isSceneViewCamera && _settings.DebugModeInSceneView)
             {
-                cmd.Blit(cameraTarget, tempHandle.Identifier(), debugMaterial);
-                cmd.Blit(tempHandle.Identifier(), cameraTarget);
+                cmd.Blit(colorTarget, tempHandle.Identifier(), debugMaterial);
+                cmd.Blit(tempHandle.Identifier(), colorTarget);
             }
-            else if ((cameraData.isDefaultViewport || cameraData.isStereoEnabled) && !cameraData.isSceneViewCamera)
+            else if ((cameraData.isDefaultViewport) && !cameraData.isSceneViewCamera)
             {
-                cmd.Blit(cameraTarget, tempHandle.Identifier(), debugMaterial);
-                cmd.Blit(tempHandle.Identifier(), cameraTarget);
+                cmd.Blit(colorTarget, tempHandle.Identifier(), debugMaterial);
+                cmd.Blit(tempHandle.Identifier(), colorTarget);
             }
         }
 
