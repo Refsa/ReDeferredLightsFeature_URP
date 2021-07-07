@@ -395,7 +395,6 @@
                 float4 nz : TEXCOORD0;
             };
 
-            #define COMPUTE_DEPTH_01 -(TransformObjectToHClip( v.vertex.xyz ).z * _ProjectionParams.w)
             #define COMPUTE_VIEW_NORMAL normalize(mul((float3x3)UNITY_MATRIX_IT_MV, v.normal))
 
             v2f vert (appdata v)
@@ -404,11 +403,24 @@
 
                 o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.nz.xyz = COMPUTE_VIEW_NORMAL;
-                o.nz.w = COMPUTE_DEPTH_01;
+                o.nz.w = -(o.vertex.z * _ProjectionParams.w);
                 
                 return o;
             }
-            
+
+            float4 frag (v2f i) : SV_Target
+            {
+                return EncodeDepthNormal(i.nz.w, i.nz.xyz);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "R_GBuffer"
+            Tags { "LightMode" = "R_GBuffer" }
+
+            HLSLINCLUDE
             inline float2 EncodeViewNormalStereo( float3 n )
             {
                 float kScale = 1.7777;
@@ -434,10 +446,82 @@
                 enc.zw = EncodeFloatRG (depth);
                 return enc;
             }
+            ENDHLSL
 
-            float4 frag (v2f i) : SV_Target
+            Blend[_SrcBlend][_DstBlend]
+            ZWrite[_ZWrite]
+            Cull[_Cull]
+            AlphaToMask On
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #pragma target 3.5
+
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct R_Attributes
             {
-                return EncodeDepthNormal(i.nz.w, i.nz.xyz);
+                float4 positionOS : POSITION;
+                float2 uv         : TEXCOORD0;
+                float3 normal     : NORMAL;
+            };
+
+            struct R_Varyings
+            {
+                float4 vertex    : SV_POSITION;
+                float2 uv        : TEXCOORD0;
+                float3 world_pos : TEXCOORD1;
+                float4 nz_enc    : TEXCOORD2;
+            };
+
+            struct Output
+            {
+                float4 albedo         : SV_TARGET0;
+                float4 specular       : SV_TARGET1;
+                float3 world_position : SV_TARGET2;
+                float4 depth_normal   : SV_TARGET3;
+            };
+
+            R_Varyings vert(R_Attributes input)
+            {
+                R_Varyings output = (R_Varyings)0;
+
+                VertexPositionInputs vertex_input = GetVertexPositionInputs(input.positionOS.xyz);
+                output.vertex = vertex_input.positionCS;
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.world_pos = mul(unity_ObjectToWorld, float4(input.positionOS.xyz, 1.0)).xyz;
+
+                output.nz_enc.xyz = normalize(mul((float3x3)UNITY_MATRIX_IT_MV, input.normal));
+                // output.nz_enc.w = -(vertex_input.positionCS.z * _ProjectionParams.w);
+                output.nz_enc.w = vertex_input.positionCS.z;
+
+                return output;
+            }
+
+            Output frag(R_Varyings input)
+            {
+                float4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                albedo.rgb *= _BaseColor.rgb;
+
+                SurfaceData surface_data;
+                InitializeStandardLitSurfaceData(input.uv, surface_data);
+                clip(surface_data.alpha >= 0 ? 1 : -1);
+
+                BRDFData brdf_data;
+                InitializeBRDFData(surface_data.albedo, surface_data.metallic, surface_data.specular, surface_data.smoothness, surface_data.alpha, brdf_data);
+
+                Output output = (Output)0;
+
+                output.albedo         = float4(albedo.rgb, surface_data.alpha);
+                output.specular       = float4(brdf_data.specular, brdf_data.roughness);
+                output.world_position = input.world_pos;
+                output.depth_normal   = EncodeDepthNormal(input.nz_enc.w, input.nz_enc.xyz);
+
+                return output;
             }
             ENDHLSL
         }
