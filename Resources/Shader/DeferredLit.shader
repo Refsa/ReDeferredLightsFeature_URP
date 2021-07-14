@@ -370,6 +370,7 @@
         }
 
         HLSLINCLUDE
+        #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
         inline float2 EncodeViewNormalStereo( float3 n )
         {
             float kScale = 1.7777;
@@ -391,7 +392,7 @@
         inline float4 EncodeDepthNormal( float depth, float3 normal )
         {
             float4 enc;
-            enc.xy = EncodeViewNormalStereo (normal);
+            enc.xy = EncodeViewNormalStereo (TransformWorldToViewDir(normal, true));
             enc.zw = EncodeFloatRG (depth);
             return enc;
         }
