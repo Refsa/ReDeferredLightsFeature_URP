@@ -23,8 +23,8 @@
 
             struct v2f
             {
-                float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+                float2 uv : TEXCOORD0;
             };
 
             uint _DebugMode;
@@ -33,8 +33,6 @@
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
-
-            sampler2D _DepthTexture;
 
             sampler2D _DeferredPass_DepthNormals_Texture;
             float4 _DeferredPass_DepthNormals_Texture_ST;
@@ -56,7 +54,7 @@
             v2f vert (appdata v)
             {
                 v2f o;
-                o.vertex = TransformObjectToHClip(v.vertex);
+                o.vertex = TransformObjectToHClip(v.vertex.xyz);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
             }
@@ -89,7 +87,6 @@
                 float4 dnenc = tex2D(_DeferredPass_DepthNormals_Texture, i.uv);
                 float3 normal = 0; float depth = 0; 
                 DecodeDepthNormal(dnenc, depth, normal);
-                // depth = tex2D(_DepthTexture, i.uv);
 
                 float4 specSmooth = tex2D(_DeferredPass_Specular_Texture, i.uv);
 
@@ -116,7 +113,7 @@
                     float strength = tileData.y / TileStrengthScale;
                     float4 bb = tex2D(_MainTex, i.uv);
 
-                    return float4(lerp(bb.rgb, strength, 0.05), 1.0);
+                    return float4(lerp(bb.rgb, strength, 0.5), 1.0);
                 }
 
                 return float4(0,0,0,1);

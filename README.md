@@ -47,3 +47,11 @@ Currently tested in 2020.1 with URP 8.2
 There are a few example scenes included as well.
 
 Do note that with the current content of this package the material variety for deferred pass is severly limited.
+
+# Changes
+## V0.2.0
+- More optimized GBuffer pass using MRT(Multiple Render Targets)
+    Support for MRT is limited to DX11+, OpenGL 3.2+, OpenGL ES 3+, Metal, Vulkan, PS4/XB1 and can be toggled in the Render Feature settings
+    Should improve the overhead on complex scenes drastically, since we only need to run one pass for GBuffer
+- Support for Normal/Bump maps
+- General cleanup of code base
