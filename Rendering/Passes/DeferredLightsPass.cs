@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using Settings = DeferredLightsFeature.Settings;
@@ -18,7 +19,6 @@ class DeferredLightsPass : ScriptableRenderPass
     Vector2 renderSize;
 
     Material _blitLightsMaterial;
-    TextureDimension targetDimensions;
 
     RenderTargetIdentifier colorTarget;
 
@@ -55,24 +55,19 @@ class DeferredLightsPass : ScriptableRenderPass
         int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
         int height = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
 
-        int size = 2048;
-        if (width > size) size = 4096;
-
         passSize = new Vector2(width, height);
         renderSize = new Vector2(cameraTextureDescriptor.width, cameraTextureDescriptor.height);
 
         cmd.BeginSample("DeferredLightsPass: Setup");
 
-        targetDimensions = cameraTextureDescriptor.dimension;
-
         // Lights RT
         {
-            RenderTextureDescriptor rtd = new RenderTextureDescriptor(size, size);
-            rtd.colorFormat = RenderTextureFormat.ARGBFloat;
+            RenderTextureDescriptor rtd = new RenderTextureDescriptor(width, height);
+            rtd.graphicsFormat = GraphicsFormat.R32G32B32A32_SFloat;
             rtd.depthBufferBits = 0;
             rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(lightsHandle.id, rtd);
-            ComputeShaderUtils.Utils.DispatchClear(cmd, lightsHandle.Identifier(), size, size, Color.black);
+            ComputeShaderUtils.Utils.DispatchClear(cmd, lightsHandle.Identifier(), width, height, Color.black);
         }
 
         // Full size RT
@@ -81,8 +76,6 @@ class DeferredLightsPass : ScriptableRenderPass
             rtd.enableRandomWrite = true;
             cmd.GetTemporaryRT(colorFullscreenHandle.id, rtd);
             ComputeShaderUtils.Utils.DispatchClear(cmd, colorFullscreenHandle.Identifier(), width, height, Color.black);
-            // ConfigureTarget(colorFullscreenHandle.Identifier());
-            // ConfigureClear(ClearFlag.All, Color.black);
         }
 
         // ### COMPUTE GLOBALS ###
