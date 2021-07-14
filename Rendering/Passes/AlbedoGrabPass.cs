@@ -25,8 +25,8 @@ class AlbedoGrabPass : ScriptableRenderPass
         _lightsCompute = ComputeShaderUtils.LightsCompute;
 
         renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
-        filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
 
+        filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
 
         albedoHandle.Init(ALBEDO_ID);
@@ -41,13 +41,12 @@ class AlbedoGrabPass : ScriptableRenderPass
         rtd.colorFormat = RenderTextureFormat.ARGB32;
         rtd.width = width;
         rtd.height = height;
-        rtd.depthBufferBits = 1;
+        rtd.depthBufferBits = 24;
         rtd.msaaSamples = 1;
         rtd.enableRandomWrite = true;
         cmd.GetTemporaryRT(albedoHandle.id, rtd, FilterMode.Point);
 
-        // ComputeShaderUtils.Utils.DispatchClear(cmd, albedoHandle.Identifier(), width / 32, height / 18, Color.black);
-        // cmd.Blit(colorAttachment, albedoHandle.Identifier());
+        cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
 
         ConfigureTarget(albedoHandle.Identifier());
         ConfigureClear(ClearFlag.All, Color.black);
@@ -69,7 +68,6 @@ class AlbedoGrabPass : ScriptableRenderPass
             // CoreUtils.SetRenderTarget(cmd, albedoHandle.Identifier(), ClearFlag.None, Color.clear);
             context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filteringSettings, ref renderStateBlock);
 
-            cmd.SetComputeTextureParam(_lightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, ALBEDO_ID, albedoHandle.Identifier());
             cmd.SetGlobalTexture("_DeferredPass_Albedo_Texture", albedoHandle.Identifier());
         }
 

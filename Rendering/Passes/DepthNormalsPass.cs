@@ -19,6 +19,8 @@ class DepthNormalsPass : ScriptableRenderPass
 
     ComputeShader _lightsCompute;
 
+    RenderTargetIdentifier depthTarget;
+
     public DepthNormalsPass(Settings settings)
     {
         _settings = settings;
@@ -33,6 +35,8 @@ class DepthNormalsPass : ScriptableRenderPass
         depthHandle.Init(DEPTH_ID);
     }
 
+    public RenderTargetIdentifier DepthTarget { get => depthTarget; set => depthTarget = value; }
+
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
     {
         int width = (int)((float)cameraTextureDescriptor.width * _settings.ResolutionMultiplier);
@@ -40,7 +44,7 @@ class DepthNormalsPass : ScriptableRenderPass
 
         var depthDescriptor = cameraTextureDescriptor;
         depthDescriptor.graphicsFormat = GraphicsFormat.R8G8B8A8_UNorm;
-        depthDescriptor.depthBufferBits = 0;
+        depthDescriptor.depthBufferBits = 24;
         depthDescriptor.msaaSamples = 1;
         depthDescriptor.width = width;
         depthDescriptor.height = height;
@@ -50,7 +54,7 @@ class DepthNormalsPass : ScriptableRenderPass
         cmd.SetComputeTextureParam(ComputeShaderUtils.LightsCompute, ComputeShaderUtils.LightsComputeKernels.ComputeLightsKernelID, DEPTH_NORMAL_ID, depthHandle.Identifier());
 
         ConfigureTarget(depthHandle.Identifier());
-        ConfigureClear(ClearFlag.Color, Color.black);
+        ConfigureClear(ClearFlag.All, Color.black);
     }
 
     public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)

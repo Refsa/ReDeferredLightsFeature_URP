@@ -25,7 +25,7 @@ class SpecularGrabPass : ScriptableRenderPass
         _lightsCompute = ComputeShaderUtils.LightsCompute;
 
         renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
-        filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
+        filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
         renderStateBlock = new RenderStateBlock(RenderStateMask.Nothing);
 
@@ -38,10 +38,10 @@ class SpecularGrabPass : ScriptableRenderPass
         int height = (int)((float)cameraTextureDescriptor.height * _settings.ResolutionMultiplier);
 
         var rtd = cameraTextureDescriptor;
-        rtd.colorFormat = RenderTextureFormat.ARGB32;
+        rtd.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8B8A8_UNorm;
         rtd.width = width;
         rtd.height = height;
-        rtd.depthBufferBits = 1;
+        rtd.depthBufferBits = 24;
         rtd.msaaSamples = 1;
         rtd.enableRandomWrite = true;
         cmd.GetTemporaryRT(specularHandle.id, rtd, FilterMode.Point);
