@@ -17,24 +17,17 @@ class WorldPositionPass : ScriptableRenderPass
     FilteringSettings filteringSettings;
 
     ComputeShader _lightsCompute;
-    Material _worldPositionMaterial;
 
-    public WorldPositionPass(Settings settings, Material worldPositionMaterial)
+    public WorldPositionPass(Settings settings)
     {
         _settings = settings;
         _lightsCompute = ComputeShaderUtils.LightsCompute;
-        _worldPositionMaterial = worldPositionMaterial;
 
-        shaderTagId = new ShaderTagId("DepthOnly");
+        shaderTagId = new ShaderTagId("WorldPosition");
         renderPassEvent = RenderPassEvent.AfterRenderingPrePasses;
-        filteringSettings = new FilteringSettings(RenderQueueRange.opaque, -1);
+        filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
 
         wpHandle.Init(HANDLE_ID);
-    }
-
-    public void SetMaterial(Material worldPositionMaterial)
-    {
-        _worldPositionMaterial = worldPositionMaterial;
     }
 
     public override void Configure(CommandBuffer cmd, RenderTextureDescriptor cameraTextureDescriptor)
@@ -65,8 +58,6 @@ class WorldPositionPass : ScriptableRenderPass
             var sortFlags = renderingData.cameraData.defaultOpaqueSortFlags;
 
             var drawSettings = CreateDrawingSettings(shaderTagId, ref renderingData, sortFlags);
-            drawSettings.perObjectData = PerObjectData.None;
-            drawSettings.overrideMaterial = _worldPositionMaterial;
             drawSettings.enableDynamicBatching = true;
             drawSettings.enableInstancing = true;
 

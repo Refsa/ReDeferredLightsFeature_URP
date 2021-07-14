@@ -35,8 +35,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
     WorldPositionPass worldPositionPass;
     AlbedoGrabPass albedoGrabPass;
     SpecularGrabPass specularGrabPass;
-    Material depthNormalsMaterial;
-    Material worldPositionMaterial;
 #endregion
 
     GBufferPass gBufferPass;
@@ -56,8 +54,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
             throw new System.Exception("DeferredLightsFeature setup was not successful");
         }
 
-        depthNormalsMaterial = CoreUtils.CreateEngineMaterial("Hidden/DepthNormal");
-        worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
         debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
 
         cullLightsHandler = new CullLightsHandler();
@@ -67,8 +63,8 @@ public class DeferredLightsFeature : ScriptableRendererFeature
 
         gBufferPass = new GBufferPass(settings);
 
-        worldPositionPass = new WorldPositionPass(settings, worldPositionMaterial);
-        depthNormalsPass = new DepthNormalsPass(settings, depthNormalsMaterial);
+        worldPositionPass = new WorldPositionPass(settings);
+        depthNormalsPass = new DepthNormalsPass(settings);
         albedoGrabPass = new AlbedoGrabPass(settings);
         specularGrabPass = new SpecularGrabPass(settings);
 
@@ -86,12 +82,6 @@ public class DeferredLightsFeature : ScriptableRendererFeature
         {
             if (debugMaterial == null) debugMaterial = new Material(Shader.Find("Hidden/DebugGBuffer"));
             debugPass.SetMaterial(debugMaterial);
-
-            if (worldPositionMaterial == null) worldPositionMaterial = new Material(Shader.Find("Hidden/WorldPosition"));
-            worldPositionPass.SetMaterial(worldPositionMaterial);
-
-            if (depthNormalsMaterial == null) depthNormalsMaterial = new Material(Shader.Find("Hidden/DepthNormal"));
-            depthNormalsPass.SetMaterial(depthNormalsMaterial);
 
             if (blitLightsMaterial == null) blitLightsMaterial = new Material(Shader.Find("Hidden/BlitLights"));
             lightsPass.SetMaterial(blitLightsMaterial);
