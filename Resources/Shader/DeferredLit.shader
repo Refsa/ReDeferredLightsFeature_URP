@@ -320,8 +320,8 @@
 
                 BRDFData brdfData;
                 InitializeBRDFData(surfaceData.albedo, surfaceData.metallic, surfaceData.specular, surfaceData.smoothness, surfaceData.alpha, brdfData);
-            
-                return float4(brdfData.specular, brdfData.roughness);
+                
+                return float4(surfaceData.specular, brdfData.roughness);
             }
             ENDHLSL
         }
@@ -369,6 +369,34 @@
             ENDHLSL
         }
 
+        HLSLINCLUDE
+        inline float2 EncodeViewNormalStereo( float3 n )
+        {
+            float kScale = 1.7777;
+            float2 enc;
+            enc = n.xy / (n.z+1);
+            enc /= kScale;
+            enc = enc*0.5+0.5;
+            return enc;
+        }
+        inline float2 EncodeFloatRG( float v )
+        {
+            float2 kEncodeMul = float2(1.0, 255.0);
+            float kEncodeBit = 1.0/255.0;
+            float2 enc = kEncodeMul * v;
+            enc = frac (enc);
+            enc.x -= enc.y * kEncodeBit;
+            return enc;
+        }
+        inline float4 EncodeDepthNormal( float depth, float3 normal )
+        {
+            float4 enc;
+            enc.xy = EncodeViewNormalStereo (normal);
+            enc.zw = EncodeFloatRG (depth);
+            return enc;
+        }
+        ENDHLSL
+
         Pass
         {
             Name "DepthNormal"
@@ -377,40 +405,25 @@
             Blend[_SrcBlend][_DstBlend]
             ZWrite[_ZWrite]
             Cull[_Cull]
+            ZTest LEqual
 
             HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag 
-
+            #pragma shader_feature _NORMALMAP
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
 
-            struct appdata
+            #pragma vertex LitPassVertex
+            #pragma fragment frag
+
+            float4 frag (Varyings input) : SV_Target
             {
-                float4 vertex : POSITION;
-                float3 normal : NORMAL;
-            };
-            struct v2f
-            {
-                float4 vertex : SV_POSITION;
-                float4 nz : TEXCOORD0;
-            };
+                SurfaceData surfaceData;
+                InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
-            #define COMPUTE_VIEW_NORMAL normalize(mul((float3x3)UNITY_MATRIX_IT_MV, v.normal))
+                InputData inputData;
+                InitializeInputData(input, surfaceData.normalTS, inputData);
 
-            v2f vert (appdata v)
-            {
-                v2f o;
-
-                o.vertex = TransformObjectToHClip(v.vertex.xyz);
-                o.nz.xyz = mul((float3x3)unity_ObjectToWorld, v.normal);
-                o.nz.w = -(o.vertex.z * _ProjectionParams.w);
-                
-                return o;
-            }
-
-            float4 frag (v2f i) : SV_Target
-            {
-                return EncodeDepthNormal(i.nz.w, i.nz.xyz);
+                return EncodeDepthNormal(input.positionCS.z, inputData.normalWS);
             }
             ENDHLSL
         }
@@ -420,42 +433,24 @@
             Name "R_GBuffer"
             Tags { "LightMode" = "R_GBuffer" }
 
-            HLSLINCLUDE
-            inline float2 EncodeViewNormalStereo( float3 n )
-            {
-                float kScale = 1.7777;
-                float2 enc;
-                enc = n.xy / (n.z+1);
-                enc /= kScale;
-                enc = enc*0.5+0.5;
-                return enc;
-            }
-            inline float2 EncodeFloatRG( float v )
-            {
-                float2 kEncodeMul = float2(1.0, 255.0);
-                float kEncodeBit = 1.0/255.0;
-                float2 enc = kEncodeMul * v;
-                enc = frac (enc);
-                enc.x -= enc.y * kEncodeBit;
-                return enc;
-            }
-            inline float4 EncodeDepthNormal( float depth, float3 normal )
-            {
-                float4 enc;
-                enc.xy = EncodeViewNormalStereo (normal);
-                enc.zw = EncodeFloatRG (depth);
-                return enc;
-            }
-            ENDHLSL
-
-            Blend[_SrcBlend][_DstBlend]
             ZWrite[_ZWrite]
             Cull[_Cull]
             AlphaToMask On
 
             HLSLPROGRAM
-            #define REQUIRES_WORLD_SPACE_POS_INTERPOLATOR
-            #define _NORMALMAP
+            #pragma shader_feature REQUIRES_WORLD_SPACE_POS_INTERPOLATOR
+            #pragma shader_feature _NORMALMAP
+            #pragma shader_feature _ALPHATEST_ON
+            #pragma shader_feature _ALPHAPREMULTIPLY_ON
+            #pragma shader_feature _EMISSION
+            #pragma shader_feature _METALLICSPECGLOSSMAP
+            #pragma shader_feature _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+            #pragma shader_feature _OCCLUSIONMAP
+
+            #pragma shader_feature _SPECULARHIGHLIGHTS_OFF
+            #pragma shader_feature _ENVIRONMENTREFLECTIONS_OFF
+            #pragma shader_feature _SPECULAR_SETUP
+            #pragma shader_feature _RECEIVE_SHADOWS_OFF
 
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitForwardPass.hlsl"
@@ -489,7 +484,7 @@
                 Output output = (Output)0;
 
                 output.albedo         = float4(surface_data.albedo, surface_data.alpha);
-                output.specular       = float4(brdf_data.specular, brdf_data.roughness);
+                output.specular       = float4(surface_data.specular, brdf_data.roughness);
                 output.world_position = input.positionWS;
                 output.depth_normal   = EncodeDepthNormal(input.positionCS.z, inputData.normalWS);
 
