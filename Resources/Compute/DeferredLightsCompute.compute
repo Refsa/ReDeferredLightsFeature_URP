@@ -28,7 +28,7 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
     float3 lightStrength = light.rgb;
 
     uint2 samplePos = 0;
-    float4 colSample = 0, albedoSample = 0;
+    float4 colSample = 0;
 
     for (uint i = 0; i < diff.x; i++)
     {
@@ -36,11 +36,8 @@ void UpsampleOutput (uint3 id : SV_DispatchThreadID)
         {
             samplePos = id.xy * rcp(_RenderScale) + uint2(i, j);
 
-            // colSample = _AlbedoTexture[samplePos];
             colSample = _DeferredOutputTexture[samplePos];
-
             colSample.rgb += lightStrength;
-
             _DeferredOutputTexture[samplePos] = colSample;
         }
     }
@@ -78,7 +75,7 @@ inline float3 LightingPhysicallyBased_float(PixelData pd, float attenuation, flo
 }
 
 // Unity
-half3 LightingSpecular(float3 lightColor, float3 lightDir, PixelData pd)
+inline half3 LightingSpecular(float3 lightColor, float3 lightDir, PixelData pd)
 {
     float3 floatVec = SafeNormalize(float3(lightDir) + float3(pd.ViewDir));
     float NdotH = saturate(dot(pd.Normal, floatVec));
@@ -113,7 +110,7 @@ void ComputeLights (
 
     float3 worldPos = _WorldPositionsTexture[id.xy].xyz;
 
-    [branch] if (lightCount == 0)// || !all(worldPos))
+    [branch] if (lightCount == 0 || !all(worldPos))
     {
         _DeferredLightsTexture[id.xy] = 0;
         return;
@@ -121,10 +118,11 @@ void ComputeLights (
 
     PixelData pd;
 
+    float alpha = 0;
     // Set pixel data
     {
         float4 albedo = _AlbedoTexture[id.xy].rgba;
-        float alpha = albedo.a;
+        alpha = saturate(albedo.a);
 
         float4 depthNormal = _DepthNormalsTexture[id.xy];
         float4 specular = _SpecularTexture[id.xy];
@@ -132,6 +130,11 @@ void ComputeLights (
         float depth = DecodeFloatRG(depthNormal.zw);
         float3 normal = DecodeNormal(depthNormal);
         // normal = mul(MATRIX_IV, float4(normal, 0)).xyz;
+
+        // float reflectivity = max(max(specular.r, specular.g), specular.b);
+        // float oneMinusReflectivity = 1.0 - reflectivity;
+        // float perceptualRoughness = 1 - specular.w;
+        // float roughness = max(perceptualRoughness * perceptualRoughness, HALF_MIN);
 
         float roughness = specular.w;
         float normalizationTerm = roughness * 4.0 + 2.0;
@@ -169,7 +172,7 @@ void ComputeLights (
         accLight += LightingPhysicallyBased_float(pd, atten, ldir, ld.Color);
     }
 
-    _DeferredLightsTexture[id.xy] = float4(accLight, 1.0);
+    _DeferredLightsTexture[id.xy] = float4(accLight, alpha);
 } 
 
 [numthreads(32, 32, 1)]
